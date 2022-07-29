@@ -26,54 +26,53 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-#########################################################
-# Welcome to the OptiX Toolkit (OTK)
-
-# If you have any questions, we encourage you to post on the OptiX forums:
-# https://devtalk.nvidia.com/default/board/90/
-
 # Using the latest CMake is highly recommended, to ensure up-to-date CUDA language support.
 cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
-include(CMake/Policies.cmake)
+include(../CMake/Policies.cmake)
 
-#########################################################
-# Set the project name (i.e. the VS solution file).
-project(OptiXToolkit LANGUAGES C CXX CUDA VERSION 1.0)
+project(Util LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(CMake/BuildConfig.cmake)
-
-#########################################################
-# Create and install package configuration and version files.
-
 include(GNUInstallDirs)
+include(../CMake/BuildConfig.cmake)
 
-configure_file(
-  ${OptiXToolkit_SOURCE_DIR}/CMake/OptiXToolkitConfig.cmake.in
-  ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfig.cmake @ONLY)
+add_library(ObjectStore SHARED
+  src/ObjectStore.cpp
+  )
 
-configure_file(
-  ${OptiXToolkit_SOURCE_DIR}/CMake/OptiXToolkitConfigVersion.cmake.in
-  ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfigVersion.cmake @ONLY)
-
-install(FILES ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfig.cmake
-  ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfigVersion.cmake
-  CMake/FindOptiX.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OptiXToolkit)
-
-#########################################################
-# Subdirectories
-
-add_subdirectory(Cuda)
-add_subdirectory(Util)
-add_subdirectory(Gui)
-add_subdirectory(ImageSource)
-add_subdirectory(DemandLoading)
-add_subdirectory(ObjectStore)
-
-set( OTK_BUILD_EXAMPLES ON CACHE BOOL "Enable build of OptiXToolkit examples" )
-if( ${OTK_BUILD_EXAMPLES} )
-  add_subdirectory(examples)
+if(NOT PROJECT_IS_TOP_LEVEL)
+  add_library(OptiXToolkit::ObjectStore ALIAS ObjectStore)
 endif()
+
+target_sources(ObjectStore 
+  PUBLIC 
+  FILE_SET HEADERS 
+  BASE_DIRS include
+  FILES
+  include/OptiXToolkit/ObjectStore/ObjectStore.h
+)
+
+target_include_directories(ObjectStore PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
+
+# target_link_libraries(ObjectStore PRIVATE )
+
+set_target_properties(ObjectStore PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+install(TARGETS ObjectStore
+  EXPORT ObjectStoreTargets
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
+  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  )
+
+install(EXPORT ObjectStoreTargets
+  FILE ObjectStoreTargets.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OptiXToolkit
+  NAMESPACE OptiXToolkit::
+  )
