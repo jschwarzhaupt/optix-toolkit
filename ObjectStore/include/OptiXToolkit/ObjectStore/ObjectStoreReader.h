@@ -25,3 +25,34 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+namespace otk {
+
+class ObjectStoreReader
+{
+  public:
+    /// The key is a 64-bit integer, which is typically a content-based address (CBA).
+    using Key = uint64_t;
+
+    /// Construct ObjectStoreReader from files in the specified directory.  Optionally spawns a
+    /// thread that polls the filesystem for updates. Throws std::system_error if an error occurs.
+    ObjectStoreReader( const char* directory, bool pollForUpdates );
+
+    /// Find the object with the specified key.  Returns true for success, copying the object data
+    /// into the given buffer (up to the given size) and returning the object size via result parameter.
+    /// Thread safe.
+    bool find( Key key, void* buffer, size_t bufferSize, size_t& resultSize );
+
+    /// Find the object with the specified key.  If successful, returns a newly allocated buffer of
+    /// object data, along with its size (via result parameter).  Returns an empty pointer if the
+    /// specified key was not found.  Thread safe.
+    std::unique_ptr<char> find( Key key, size_t& resultSize );
+};
+
+}  // namespace otk

@@ -39,7 +39,8 @@ include(GNUInstallDirs)
 include(../CMake/BuildConfig.cmake)
 
 add_library(ObjectStore SHARED
-  src/ObjectStore.cpp
+  src/ObjectStoreReader.cpp
+  src/ObjectStoreWriter.cpp
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -51,7 +52,8 @@ target_sources(ObjectStore
   FILE_SET HEADERS 
   BASE_DIRS include
   FILES
-  include/OptiXToolkit/ObjectStore/ObjectStore.h
+  include/OptiXToolkit/ObjectStore/ObjectStoreReader.h
+  include/OptiXToolkit/ObjectStore/ObjectStoreWriter.h
 )
 
 target_include_directories(ObjectStore PUBLIC
