@@ -31,18 +31,35 @@
 
 #include <OptiXToolkit/Util/Exception.h>
 
-#include <cstring>  // for strerror
 #include <errno.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
+
+// Prefix some symbols with underscore under Windows
+#ifdef WIN32
+#define US(x) _ ## x
+#else
+#define US(x) x
+#endif
+
 
 namespace otk {
 
 ObjectFileWriter::ObjectFileWriter( const char* path )
 {
-    // Open file.
+    // File permissions
+#ifdef WIN32
+    int mode = _S_IREAD | _S_IWRITE;
+#else
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
-    m_descriptor = open( path, O_WRONLY | O_APPEND | O_CREAT | O_TRUNC, mode );
+#endif
+
+    // Open file.
+    m_descriptor = US(open)( path, US(O_WRONLY) | US(O_APPEND) | US(O_CREAT) | US(O_TRUNC), mode );
     if( m_descriptor < 0 )
     {
         throw Exception( "Cannot open object file", errno );
@@ -50,18 +67,23 @@ ObjectFileWriter::ObjectFileWriter( const char* path )
 
     // Write header and synchronize.
     ObjectFileHeader header;
-    write( m_descriptor, &header, sizeof( header ) );
+    US(write)( m_descriptor, &header, sizeof( header ) );
     synchronize();
 }
 
 ObjectFileWriter::~ObjectFileWriter()
 {
-    close( m_descriptor );
+    US(close)( m_descriptor );
 }
 
 void ObjectFileWriter::synchronize()
 {
-    if( fdatasync( m_descriptor ) )
+#ifdef WIN32
+    int status = _commit(m_descriptor);
+#else    
+    int status = fdatasync( m_descriptor );
+#endif
+    if( status )
     {
         throw Exception( "Call to fdatasync failed", errno );
     }

@@ -43,7 +43,7 @@ ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, 
     std::filesystem::create_directory( directory ); // throws on error
 
     std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new ObjectFileWriter( filename.c_str() ) );
+    m_file.reset( new ObjectFileWriter( filename.string().c_str() ) );
 
     synchronize();
 }

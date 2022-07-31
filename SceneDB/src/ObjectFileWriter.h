@@ -29,7 +29,9 @@
 #pragma once
 
 #include <cstddef>
+#ifndef _WIN32
 #include <sys/uio.h>
+#endif
 
 namespace otk {
 

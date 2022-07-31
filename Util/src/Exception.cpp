@@ -46,8 +46,13 @@ std::string Exception::createMessage( OptixResult res, const char* msg )
 
 std::string Exception::createMessage( const char* msg, int errnum )
 {
+#ifdef WIN32
+    // strerror is threadsafe under Windows
+    const char* errmsg = strerror( errnum );
+#else
     char errbuf[256];
     const char* errmsg = strerror_r( errnum, errbuf, 256 );
+#endif 
     std::ostringstream out;
     out << msg << " (errno=" << errnum << ": " << errmsg << ")";
     return out.str();
