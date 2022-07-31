@@ -31,11 +31,17 @@
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( size_t bufferSize, bool discardDuplicates )
-    : m_discardDuplicates( discardDuplicates )
+ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
 {
     OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
     OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
+
+    synchronize();
+}
+
+void ObjectStoreWriter::synchronize()
+{
+    // TODO
 }
 
 }  // namespace otk

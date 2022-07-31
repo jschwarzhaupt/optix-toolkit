@@ -26,58 +26,26 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# Using the latest CMake is highly recommended, to ensure up-to-date CUDA language support.
-cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
-include(../CMake/Policies.cmake)
+include( ../../CMake/FetchGtest.cmake )
 
-project(Util LANGUAGES C CXX CUDA)
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
-set(CMAKE_CXX_EXTENSIONS OFF)
+add_executable( testSceneDB
+  main.cpp
+  TestObjectStore.cpp
+  )  
 
-include(GNUInstallDirs)
-include(../CMake/BuildConfig.cmake)
-
-add_library(SceneDB SHARED
-  src/ObjectStoreReader.cpp
-  src/ObjectStoreWriter.cpp
+target_include_directories( testSceneDB PUBLIC
+  ../src
   )
 
-if(NOT PROJECT_IS_TOP_LEVEL)
-  add_library(OptiXToolkit::SceneDB ALIAS SceneDB)
+target_link_libraries( testSceneDB
+  SceneDB
+  OptiXToolkit::Util
+  gtest
+  )
+
+# Copy shared libraries that the built executable depends on.
+if( $<TARGET_RUNTIME_DLLS:testSceneDB> )
+  add_custom_command( TARGET testSceneDB POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:testSceneDB> $<TARGET_FILE_DIR:testSceneDB>
+    COMMAND_EXPAND_LISTS )
 endif()
-
-target_sources(SceneDB 
-  PUBLIC 
-  FILE_SET HEADERS 
-  BASE_DIRS include
-  FILES
-  include/OptiXToolkit/SceneDB/ObjectStoreReader.h
-  include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
-)
-
-target_include_directories(SceneDB PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-  )
-
-target_link_libraries(SceneDB PRIVATE
-  OptiXToolkit::Util )
-
-set_target_properties(SceneDB PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-
-install(TARGETS SceneDB
-  EXPORT SceneDBTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  )
-
-install(EXPORT SceneDBTargets
-  FILE SceneDBTargets.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OptiXToolkit
-  NAMESPACE OptiXToolkit::
-  )
-
-add_subdirectory("tests")

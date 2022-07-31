@@ -42,7 +42,7 @@ class ObjectStoreReader
 
     /// Construct ObjectStoreReader from files in the specified directory.  Optionally spawns a
     /// thread that polls the filesystem for updates. Throws std::system_error if an error occurs.
-    ObjectStoreReader( const char* directory, bool pollForUpdates );
+    ObjectStoreReader( const char* directory, bool pollForUpdates = false );
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer (up to the given size) and returning the object size via result parameter.

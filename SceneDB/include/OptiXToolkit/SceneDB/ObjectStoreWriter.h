@@ -39,14 +39,15 @@ class ObjectStoreWriter
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
-    /// Construct ObjectStoreWriter, overwriting files in the specified directory (creating it if
-    /// necessary).  Throws std::system_error if an error occurs.
+    /// Construct ObjectStoreWriter.  Throws std::system_error if an error occurs.
+    /// \param directory { Name of directory to contain object store files.  Created if necessary
+    /// (using current umask).  Any existing object store files are removed. }
     /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
     /// never written.  The buffer is flushed when writing an object record that would overflow the
     /// buffer.  (An object record includes the key and the object size.) }
     /// \param discardDuplicates { When true, the ObjectStoreWriter discards insertions for keys
     /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
-    explicit ObjectStoreWriter( size_t bufferSize = 0, bool discardDuplicates = false );
+    explicit ObjectStoreWriter( const char* directory, size_t bufferSize = 0, bool discardDuplicates = false );
 
     /// Insert an object with the specified key. Thread safe. Throws std::system_error if an error
     /// occurs.
@@ -64,9 +65,6 @@ class ObjectStoreWriter
     /// Synchronize, ensuring that data from previous operations is written to disk (using
     /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
     void synchronize();
-
-  private:
-    bool m_discardDuplicates = false;
 };
 
 }  // namespace otk

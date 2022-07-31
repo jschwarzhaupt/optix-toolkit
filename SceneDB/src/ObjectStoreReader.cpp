@@ -27,3 +27,14 @@
 //
 
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+
+#include <OptiXToolkit/Util/Exception.h>
+
+namespace otk {
+
+ObjectStoreReader::ObjectStoreReader( const char* directory, bool pollForUpdates )
+{
+    OTK_ASSERT_MSG( !pollForUpdates, "ObjectStoreReader polling is TBD." );
+}
+
+} // namespace otk
