@@ -26,35 +26,67 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
+
+#include "ObjectInfo.h"
+
+#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
 
-namespace otk {
+using path = std::filesystem::path;
 
+namespace otk {
+    
 ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
 {
     OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
     OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
 
-    std::filesystem::create_directory( directory ); // throws on error
+    std::filesystem::create_directory( directory ); // throws if error
 
-    std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new AppendOnlyFile( filename.string().c_str() ) );
-
-    synchronize();
+    m_objects.reset( new AppendOnlyFile( ( path( directory ) / "objects.dat" ).string().c_str() ) );
+    m_objectInfo.reset( new AppendOnlyFile( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
 }
 
-ObjectStoreWriter::~ObjectStoreWriter()
+void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers )
 {
-    // The file is closed by ~AppendOnlyFile.
+    // TODO: discard if duplicate.
+    // TODO: can update index before appending, since deduplication doesn't require offsets.
+    
+#if 1
+    // Option 1: object file doesn't contains keys and sizes.
+    off_t offset = m_objects->appendV( buffers, numBuffers );
+    size_t size = sumBufferSizes( buffers, numBuffers );
+#else
+    // Option 2: object data is preceded by its key and size.  Multiple appends wouldn't be atomic,
+    // but we can append multiple buffers atomically.
+    m_buffers.clear();
+    m_buffers.reserve( numBuffers + 2 );  // this allocation is amortized.
+
+    // Construct a Buffer representing the key.
+    m_buffers.push_back( Buffer{&key, sizeof( Key )} );
+
+    // Construct a Buffer representing the size.
+    m_buffers.push_back( Buffer{&size, sizeof( size_t )} );
+
+    // Copy the remaining Buffer structs
+    m_buffers.insert( m_buffers.end(), buffers, buffers + numBuffers );
+
+    // Append the buffers to the object file.
+    off_t offset = m_objects.appendV( m_buffers.data(), static_cast<int>( m_buffers.size() ) );
+#endif
+
+    // Write record to object log.
+    ObjectInfo info{ key, offset, size };
+    m_objectInfo->append( &info, sizeof( ObjectInfo ) );
 }
 
 void ObjectStoreWriter::synchronize()
 {
-    m_file->synchronize();
+    m_objects->synchronize();
+    m_objectInfo->synchronize();
 }
 
 }  // namespace otk

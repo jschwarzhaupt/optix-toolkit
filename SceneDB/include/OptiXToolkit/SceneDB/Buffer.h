@@ -26,36 +26,27 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
+#pragma once
 
-#include <cstring>
+#include <cstddef>
 
-#include <gtest/gtest.h>
+namespace otk {
 
-using namespace otk;
-
-class TestAppendOnlyFile : public testing::Test
+/// Buffer data and size.  Isomorphic to the Unix iovec struct used by pwritev.
+struct Buffer
 {
+    const void* data;
+    size_t      size;
 };
 
-TEST_F(TestAppendOnlyFile, TestCtors)
+inline size_t sumBufferSizes( const Buffer* buffers, int numBuffers )
 {
-    AppendOnlyFile file("objects.dat");
+    size_t size = 0;
+    for( int i = 0; i < numBuffers; ++i )
+    {
+        size += buffers[i].size;
+    }
+    return size;
 }
 
-TEST_F(TestAppendOnlyFile, TestAppend)
-{
-    AppendOnlyFile file( "objects.dat" );
-    const char*    str = "hello, world!";
-    file.append( str, strlen( str ) );
-}
-
-TEST_F(TestAppendOnlyFile, TestAppendV)
-{
-    AppendOnlyFile file( "objects.dat" );
-    const char*    str1 = "hello, world!";
-    const char*    str2 = "goodbye, cruel world.";
-
-    Buffer buffers[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
-    file.append( buffers, 2 );
-}
+} // namespace otk

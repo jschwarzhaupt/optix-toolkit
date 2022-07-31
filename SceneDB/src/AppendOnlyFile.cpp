@@ -68,15 +68,9 @@ AppendOnlyFile::~AppendOnlyFile()
     US( close )( m_descriptor );
 }
 
-off_t AppendOnlyFile::append( Buffer* buffers, int numBuffers )
+off_t AppendOnlyFile::appendV( const Buffer* buffers, int numBuffers )
 {
-    // Sum buffer sizes.
-    size_t size = 0;
-    for( int i = 0; i < numBuffers; ++i )
-    {
-        size += buffers[i].size;
-    }
-
+    size_t size = sumBufferSizes( buffers, numBuffers );
     // Extend file.
     off_t end = lseek( m_descriptor, size, SEEK_END );
     if( end < 0 )
@@ -85,7 +79,7 @@ off_t AppendOnlyFile::append( Buffer* buffers, int numBuffers )
     // Write buffers.
     OTK_ASSERT(end >= size);
     off_t begin = end - size;
-    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<::iovec*>( buffers ), numBuffers, begin );
+    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( buffers ), numBuffers, begin );
     if( bytesWritten != size )
         throw Exception( "Error writing data to AppendOnlyFile" );
     return begin;

@@ -42,3 +42,10 @@ TEST_F(TestObjectStore, TestCtors)
     ObjectStoreWriter writer("_store");
     ObjectStoreReader reader("_store");
 }
+
+TEST_F(TestObjectStore, TestInsert)
+{
+    ObjectStoreWriter writer("_store");
+    const char* str = "Hello, world!";
+    writer.insert( 1, str, strlen( str ) );
+}

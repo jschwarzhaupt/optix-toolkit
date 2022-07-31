@@ -28,9 +28,13 @@
 
 #pragma once
 
+#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
+#include <OptiXToolkit/SceneDB/Buffer.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace otk {
 
@@ -50,16 +54,18 @@ class ObjectStoreWriter
     /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
     explicit ObjectStoreWriter( const char* directory, size_t bufferSize = 0, bool discardDuplicates = false );
 
-    /// Destroy the ObjectStoreWriter, closing any associated files.
-    ~ObjectStoreWriter();
+    /// Insert an object with the specified key, concatenating the object data from multiple
+    /// buffers, each of which is specified by a data pointer and size.  Thread safe. Throws an
+    /// exception if an error occurs.
+    void insertV( Key key, const Buffer* buffers, int numBuffers );
 
     /// Insert an object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
-    void insert( Key key, void* data, size_t size );
-
-    /// Insert an object with the specified key, concatenating the object data from multiple data
-    /// sources, each with an associated size. Thread safe. Throws an exception if an error occurs.
-    void insert( Key key, void** data, size_t* sizes, int count );
+    void insert( Key key, const void* data, size_t size )
+    {
+        Buffer buffer{data, size};
+        insertV( key, &buffer, 1 );
+    }
 
     /// Remove any object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
@@ -70,7 +76,9 @@ class ObjectStoreWriter
     void synchronize();
 
   private:
-    std::unique_ptr<class AppendOnlyFile> m_file;
+    std::unique_ptr<AppendOnlyFile> m_objects;
+    std::unique_ptr<AppendOnlyFile> m_objectInfo;
+    std::vector<Buffer>             m_buffers;  // amortizes allocation cost
 };
 
 }  // namespace otk

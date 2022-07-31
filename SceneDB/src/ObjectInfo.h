@@ -26,36 +26,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
+#pragma once
 
-#include <cstring>
+#include <cstddef>
 
-#include <gtest/gtest.h>
+namespace otk {
 
-using namespace otk;
-
-class TestAppendOnlyFile : public testing::Test
+struct ObjectInfo
 {
+    uint64_t key;
+    off_t    offset;
+    size_t   size;
 };
-
-TEST_F(TestAppendOnlyFile, TestCtors)
-{
-    AppendOnlyFile file("objects.dat");
-}
-
-TEST_F(TestAppendOnlyFile, TestAppend)
-{
-    AppendOnlyFile file( "objects.dat" );
-    const char*    str = "hello, world!";
-    file.append( str, strlen( str ) );
-}
-
-TEST_F(TestAppendOnlyFile, TestAppendV)
-{
-    AppendOnlyFile file( "objects.dat" );
-    const char*    str1 = "hello, world!";
-    const char*    str2 = "goodbye, cruel world.";
-
-    Buffer buffers[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
-    file.append( buffers, 2 );
-}
+    
+} // namespace otk
