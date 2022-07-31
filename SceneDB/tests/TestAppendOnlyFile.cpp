@@ -46,16 +46,16 @@ TEST_F(TestAppendOnlyFile, TestCtors)
 TEST_F(TestAppendOnlyFile, TestAppend)
 {
     AppendOnlyFile file( "objects.dat" );
-    const char*      str = "hello, world!";
+    const char*    str = "hello, world!";
     file.append( str, strlen( str ) );
 }
 
 TEST_F(TestAppendOnlyFile, TestAppendV)
 {
     AppendOnlyFile file( "objects.dat" );
-    const char*      str1 = "hello, world!";
-    const char*      str2 = "goodbye, cruel world.";
+    const char*    str1 = "hello, world!";
+    const char*    str2 = "goodbye, cruel world.";
 
-    ::iovec buffers[2] = {{const_cast<char*>( str1 ), strlen( str1 )}, {const_cast<char*>( str2 ), strlen( str2 )}};
+    AppendOnlyFile::Buffer buffers[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
     file.append( buffers, 2 );
 }

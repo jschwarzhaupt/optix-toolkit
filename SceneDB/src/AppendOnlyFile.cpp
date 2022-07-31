@@ -68,19 +68,13 @@ AppendOnlyFile::~AppendOnlyFile()
     US( close )( m_descriptor );
 }
 
-off_t AppendOnlyFile::append( const void* data, size_t size )
-{
-    ::iovec buffer = {const_cast<void*>( data ), size};
-    return append( &buffer, 1 );
-}
-
-off_t AppendOnlyFile::append( ::iovec* buffers, int numBuffers )
+off_t AppendOnlyFile::append( Buffer* buffers, int numBuffers )
 {
     // Sum buffer sizes.
     size_t size = 0;
     for( int i = 0; i < numBuffers; ++i )
     {
-        size += buffers[i].iov_len;
+        size += buffers[i].size;
     }
 
     // Extend file.
@@ -91,7 +85,7 @@ off_t AppendOnlyFile::append( ::iovec* buffers, int numBuffers )
     // Write buffers.
     OTK_ASSERT(end >= size);
     off_t begin = end - size;
-    ssize_t bytesWritten = pwritev( m_descriptor, buffers, numBuffers, begin );
+    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<::iovec*>( buffers ), numBuffers, begin );
     if( bytesWritten != size )
         throw Exception( "Error writing data to AppendOnlyFile" );
     return begin;

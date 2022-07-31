@@ -35,24 +35,38 @@
 
 namespace otk {
 
+/// A lock-free, thread-safe, append-only file.  Append operations are accomplished by extending the
+/// file (using lseek) and then writing the data (using pwritev).  Not multiprocess-safe (because
+/// lseek does not modify the file on disk).
 class AppendOnlyFile
 {
   public:
-    /// Construct AppendOnlyFile, creating or overwriting the specified file.  Throws
-    /// an exception if an error occurs.
+    /// Construct AppendOnlyFile, creating or overwriting the specified file.  Throws an exception
+    /// if an error occurs.
     explicit AppendOnlyFile( const char* path );
 
     /// Destory AppendOnlyFile, closing the associated file.
     ~AppendOnlyFile();
 
-    /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
-    /// exception if an error
-    off_t append( const void* data, size_t size );
+    /// Buffer data and size (isomorphic to the Unix iovec struct used by pwritev).
+    struct Buffer
+    {
+        const void* data;
+        size_t      size;
+    };
 
     /// Append the data from the given buffers, which are specified by iovec structs containing a
     /// data pointer and size.  Returns the file offset of the data. Thread safe. Throws an
     /// exception if an error occurs.
-    off_t append( ::iovec* buffers, int numBuffers );
+    off_t append( Buffer* buffers, int numBuffers );
+
+    /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
+    /// exception if an error occurs.
+    off_t append( const void* data, size_t size )
+    {
+        Buffer buffer{data, size};
+        return append( &buffer, 1 );
+    }
 
     /// Synchronize, ensuring that data from previous operations is written to disk (using
     /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
