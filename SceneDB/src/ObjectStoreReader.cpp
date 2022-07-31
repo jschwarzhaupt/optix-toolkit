@@ -26,13 +26,4 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/ObjectStore/ObjectStoreWriter.h>
-
-namespace otk {
-
-ObjectStoreWriter::ObjectStoreWriter( bool discardDuplicates )
-    : m_discardDuplicates( discardDuplicates )
-{
-}
-
-}  // namespace otk
+#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>

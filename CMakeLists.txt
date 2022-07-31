@@ -71,7 +71,7 @@ add_subdirectory(Util)
 add_subdirectory(Gui)
 add_subdirectory(ImageSource)
 add_subdirectory(DemandLoading)
-add_subdirectory(ObjectStore)
+add_subdirectory(SceneDB)
 
 set( OTK_BUILD_EXAMPLES ON CACHE BOOL "Enable build of OptiXToolkit examples" )
 if( ${OTK_BUILD_EXAMPLES} )

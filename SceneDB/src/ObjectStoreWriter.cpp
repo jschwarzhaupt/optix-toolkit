@@ -26,44 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#pragma once
-
-#include <cstddef>
-#include <cstdint>
+#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 
 namespace otk {
 
-class ObjectStoreWriter
+ObjectStoreWriter::ObjectStoreWriter( bool discardDuplicates )
+    : m_discardDuplicates( discardDuplicates )
 {
-  public:
-    /// The key is a 64-bit integer, which is typically a content-based address (CBA).
-    using Key = uint64_t;
-
-    /// Construct ObjectStoreWriter, overwriting files in the specified directory (creating it if
-    /// necessary).  Throws std::system_error if an error occurs.  
-    /// \param discardDuplicates { When true, the ObjectStore discards insertions for keys that are
-    /// already stored, which is useful when keys are content-based addresses (CBAs). }
-    explicit ObjectStoreWriter( bool discardDuplicates );
-
-    /// Insert an object with the specified key. Thread safe. Throws std::system_error if an error
-    /// occurs.
-    void insert( Key key, void* data, size_t size );
-
-    /// Insert an object with the specified key, concatenating the object data from multiple data
-    /// sources, each with an associated size. Thread safe. Throws std::system_error if an error
-    /// occurs.
-    void insert( Key key, void** data, size_t* sizes, int count );
-
-    /// Remove any object with the specified key. Thread safe. Throws std::system_error if an error
-    /// occurs.
-    void remove( Key key );
-
-    /// Synchronize, ensuring that data from previous operations is written to disk (using
-    /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
-    void synchronize();
-
-  private:
-    bool m_discardDuplicates = true;
-};
+}
 
 }  // namespace otk
