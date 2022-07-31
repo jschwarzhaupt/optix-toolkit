@@ -110,8 +110,14 @@ class Exception : public std::runtime_error
     {
     }
 
+    Exception( const char* msg, int errnum )
+        : std::runtime_error( createMessage( msg, errnum ).c_str() )
+    {
+    }
+
   private:
     std::string createMessage( OptixResult res, const char* msg );
+    std::string createMessage( const char* msg, int errnum );
 };
 
 void optixCheck( OptixResult res, const char* call, const char* file, unsigned int line );

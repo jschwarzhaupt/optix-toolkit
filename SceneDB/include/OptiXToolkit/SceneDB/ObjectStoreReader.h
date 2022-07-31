@@ -41,7 +41,7 @@ class ObjectStoreReader
     using Key = uint64_t;
 
     /// Construct ObjectStoreReader from files in the specified directory.  Optionally spawns a
-    /// thread that polls the filesystem for updates. Throws std::system_error if an error occurs.
+    /// thread that polls the filesystem for updates. Throws an exception if an error occurs.
     ObjectStoreReader( const char* directory, bool pollForUpdates = false );
 
     /// Find the object with the specified key.  Returns true for success, copying the object data

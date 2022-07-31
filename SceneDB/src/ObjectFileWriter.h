@@ -26,36 +26,33 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectFileWriter.h"
+#pragma once
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-#include <OptiXToolkit/Util/Exception.h>
-
-#include <filesystem>
+#include <cstddef>
+#include <sys/uio.h>
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
+class ObjectFileWriter
 {
-    OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
-    OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
+  public:
+    /// Construct ObjectFileWriter, creating or overwriting the specified file.  Throws
+    /// an exception if an error occurs.
+    explicit ObjectFileWriter( const char* path );
 
-    std::filesystem::create_directory( directory ); // throws on error
+    /// Destory ObjectFileWriter, closing the associated file.
+    ~ObjectFileWriter();
 
-    std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new ObjectFileWriter( filename.c_str() ) );
+    /// Append the data from the given buffers. Thread safe. Throws an exception if an error
+    /// occurs.
+    void append( struct iovec* buffers, int numBuffers );
 
-    synchronize();
-}
+    /// Synchronize, ensuring that data from previous operations is written to disk (using
+    /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
+    void synchronize();
 
-ObjectStoreWriter::~ObjectStoreWriter()
-{
-    // The file is closed by ~ObjectFileWriter.
-}
-
-void ObjectStoreWriter::synchronize()
-{
-    m_file->synchronize();
-}
+  private:
+    int m_descriptor;
+};
 
 }  // namespace otk

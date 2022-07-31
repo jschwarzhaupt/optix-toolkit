@@ -31,6 +31,7 @@ include( ../../CMake/FetchGtest.cmake )
 add_executable( testSceneDB
   main.cpp
   TestObjectStore.cpp
+  TestObjectFile.cpp
   )  
 
 target_include_directories( testSceneDB PUBLIC

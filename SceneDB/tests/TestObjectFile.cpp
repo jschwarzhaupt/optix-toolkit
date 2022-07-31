@@ -28,34 +28,15 @@
 
 #include "ObjectFileWriter.h"
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-#include <OptiXToolkit/Util/Exception.h>
+#include <gtest/gtest.h>
 
-#include <filesystem>
+using namespace otk;
 
-namespace otk {
-
-ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
+class TestObjectFile : public testing::Test
 {
-    OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
-    OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
+};
 
-    std::filesystem::create_directory( directory ); // throws on error
-
-    std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new ObjectFileWriter( filename.c_str() ) );
-
-    synchronize();
-}
-
-ObjectStoreWriter::~ObjectStoreWriter()
+TEST_F(TestObjectFile, TestCtors)
 {
-    // The file is closed by ~ObjectFileWriter.
+    ObjectFileWriter writer("objects.dat");
 }
-
-void ObjectStoreWriter::synchronize()
-{
-    m_file->synchronize();
-}
-
-}  // namespace otk

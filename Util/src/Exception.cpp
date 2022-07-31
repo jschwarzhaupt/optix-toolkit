@@ -31,6 +31,7 @@
 #include <optix_function_table_definition.h>
 #include <optix_stubs.h>
 
+#include <cstring>  // for strerror_r
 #include <iostream>
 #include <sstream>
 
@@ -43,6 +44,15 @@ std::string Exception::createMessage( OptixResult res, const char* msg )
     return out.str();
 }
 
+std::string Exception::createMessage( const char* msg, int errnum )
+{
+    char errbuf[256];
+    const char* errmsg = strerror_r( errnum, errbuf, 256 );
+    std::ostringstream out;
+    out << msg << " (errno=" << errnum << ": " << errmsg << ")";
+    return out.str();
+}
+    
 void optixCheck( OptixResult res, const char* call, const char* file, unsigned int line )
 {
     if( res != OPTIX_SUCCESS )

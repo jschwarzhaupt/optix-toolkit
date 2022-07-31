@@ -27,35 +27,44 @@
 //
 
 #include "ObjectFileWriter.h"
+#include "ObjectFile.h"
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 #include <OptiXToolkit/Util/Exception.h>
 
-#include <filesystem>
+#include <cstring>  // for strerror
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
+ObjectFileWriter::ObjectFileWriter( const char* path )
 {
-    OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
-    OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
+    // Open file.
+    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+    m_descriptor = open( path, O_WRONLY | O_APPEND | O_CREAT | O_TRUNC, mode );
+    if( m_descriptor < 0 )
+    {
+        throw Exception( "Cannot open object file", errno );
+    }
 
-    std::filesystem::create_directory( directory ); // throws on error
-
-    std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new ObjectFileWriter( filename.c_str() ) );
-
+    // Write header and synchronize.
+    ObjectFileHeader header;
+    write( m_descriptor, &header, sizeof( header ) );
     synchronize();
 }
 
-ObjectStoreWriter::~ObjectStoreWriter()
+ObjectFileWriter::~ObjectFileWriter()
 {
-    // The file is closed by ~ObjectFileWriter.
+    close( m_descriptor );
 }
 
-void ObjectStoreWriter::synchronize()
+void ObjectFileWriter::synchronize()
 {
-    m_file->synchronize();
+    if( fdatasync( m_descriptor ) )
+    {
+        throw Exception( "Call to fdatasync failed", errno );
+    }
 }
 
 }  // namespace otk

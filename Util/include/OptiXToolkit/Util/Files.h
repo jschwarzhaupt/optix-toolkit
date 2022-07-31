@@ -30,9 +30,9 @@
 
 namespace otk {
 
-// Return a path to a file in the runtime subdirectory, falling back on a relative path to the
-// specified subdirectory.  Returns NULL if the file cannot be located.  The pointer returned may
-// point to a static array.
+/// Return a path to a file in the runtime subdirectory, falling back on a relative path to the
+/// specified subdirectory.  Returns NULL if the file cannot be located.  The pointer returned may
+/// point to a static array.
 const char* getRuntimeFilePath( const char* relativeSubDir, const char* relativePath );
 
 } // namespace otk

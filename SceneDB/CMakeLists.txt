@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 include(../CMake/Policies.cmake)
 
 project(Util LANGUAGES C CXX CUDA)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -39,6 +39,7 @@ include(GNUInstallDirs)
 include(../CMake/BuildConfig.cmake)
 
 add_library(SceneDB SHARED
+  src/ObjectFileWriter.cpp
   src/ObjectStoreReader.cpp
   src/ObjectStoreWriter.cpp
   )
@@ -54,6 +55,10 @@ target_sources(SceneDB
   FILES
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h
   include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
+)
+
+source_group( "Header Files\\Implementation" FILES
+  src/ObjectFileWriter.h
 )
 
 target_include_directories(SceneDB PUBLIC

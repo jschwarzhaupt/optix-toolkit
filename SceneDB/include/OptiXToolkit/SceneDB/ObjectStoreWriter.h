@@ -30,6 +30,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace otk {
 
@@ -39,7 +40,7 @@ class ObjectStoreWriter
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
-    /// Construct ObjectStoreWriter.  Throws std::system_error if an error occurs.
+    /// Construct ObjectStoreWriter.  Throws an exception if an error occurs.
     /// \param directory { Name of directory to contain object store files.  Created if necessary
     /// (using current umask).  Any existing object store files are removed. }
     /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
@@ -49,22 +50,27 @@ class ObjectStoreWriter
     /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
     explicit ObjectStoreWriter( const char* directory, size_t bufferSize = 0, bool discardDuplicates = false );
 
-    /// Insert an object with the specified key. Thread safe. Throws std::system_error if an error
+    /// Destroy the ObjectStoreWriter, closing any associated files.
+    ~ObjectStoreWriter();
+
+    /// Insert an object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
     void insert( Key key, void* data, size_t size );
 
     /// Insert an object with the specified key, concatenating the object data from multiple data
-    /// sources, each with an associated size. Thread safe. Throws std::system_error if an error
-    /// occurs.
+    /// sources, each with an associated size. Thread safe. Throws an exception if an error occurs.
     void insert( Key key, void** data, size_t* sizes, int count );
 
-    /// Remove any object with the specified key. Thread safe. Throws std::system_error if an error
+    /// Remove any object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
     void remove( Key key );
 
     /// Synchronize, ensuring that data from previous operations is written to disk (using
-    /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
+    /// fdatasync).  Data from any concurrent operations is not guaranteed to be synchronized.
     void synchronize();
+
+  private:
+    std::unique_ptr<class ObjectFileWriter> m_file;
 };
 
 }  // namespace otk
