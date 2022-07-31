@@ -53,13 +53,12 @@ target_sources(SceneDB
   FILE_SET HEADERS 
   BASE_DIRS include
   FILES
+  include/OptiXToolkit/SceneDB/AppendOnlyFile.h
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h
   include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
 )
 
-source_group( "Header Files\\Implementation" FILES
-  src/AppendOnlyFile.h
-)
+# source_group( "Header Files\\Implementation" FILES )
 
 target_include_directories(SceneDB PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
