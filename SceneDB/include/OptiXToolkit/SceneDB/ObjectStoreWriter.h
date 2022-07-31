@@ -40,10 +40,13 @@ class ObjectStoreWriter
     using Key = uint64_t;
 
     /// Construct ObjectStoreWriter, overwriting files in the specified directory (creating it if
-    /// necessary).  Throws std::system_error if an error occurs.  
+    /// necessary).  Throws std::system_error if an error occurs.
+    /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
+    /// never written.  The buffer is flushed when writing an object record that would overflow the
+    /// buffer.  (An object record includes the key and the object size.) }
     /// \param discardDuplicates { When true, the ObjectStoreWriter discards insertions for keys
     /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
-    explicit ObjectStoreWriter( bool discardDuplicates );
+    explicit ObjectStoreWriter( size_t bufferSize = 0, bool discardDuplicates = false );
 
     /// Insert an object with the specified key. Thread safe. Throws std::system_error if an error
     /// occurs.
@@ -63,7 +66,7 @@ class ObjectStoreWriter
     void synchronize();
 
   private:
-    bool m_discardDuplicates = true;
+    bool m_discardDuplicates = false;
 };
 
 }  // namespace otk

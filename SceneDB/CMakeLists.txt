@@ -61,7 +61,8 @@ target_include_directories(SceneDB PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
-# target_link_libraries(SceneDB PRIVATE )
+target_link_libraries(SceneDB PRIVATE
+  OptiXToolkit::Util )
 
 set_target_properties(SceneDB PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 

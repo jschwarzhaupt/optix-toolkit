@@ -27,12 +27,15 @@
 //
 
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
+#include <OptiXToolkit/Util/Exception.h>
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( bool discardDuplicates )
+ObjectStoreWriter::ObjectStoreWriter( size_t bufferSize, bool discardDuplicates )
     : m_discardDuplicates( discardDuplicates )
 {
+    OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
+    OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
 }
 
 }  // namespace otk
