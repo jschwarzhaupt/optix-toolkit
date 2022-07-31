@@ -45,9 +45,13 @@ class ObjectFileWriter
     /// Destory ObjectFileWriter, closing the associated file.
     ~ObjectFileWriter();
 
-    /// Append the data from the given buffers. Thread safe. Throws an exception if an error
-    /// occurs.
-    void append( struct iovec* buffers, int numBuffers );
+    /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
+    /// exception if an error
+    off_t append( const void* data, size_t size );
+
+    /// Append the data from the given buffers. Returns the file offset of the data. Thread
+    /// safe. Throws an exception if an error occurs.
+    off_t append( ::iovec* buffers, int numBuffers );
 
     /// Synchronize, ensuring that data from previous operations is written to disk (using
     /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.

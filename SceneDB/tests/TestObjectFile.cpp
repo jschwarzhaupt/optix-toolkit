@@ -28,6 +28,8 @@
 
 #include "ObjectFileWriter.h"
 
+#include <cstring>
+
 #include <gtest/gtest.h>
 
 using namespace otk;
@@ -39,4 +41,21 @@ class TestObjectFile : public testing::Test
 TEST_F(TestObjectFile, TestCtors)
 {
     ObjectFileWriter writer("objects.dat");
+}
+
+TEST_F(TestObjectFile, TestAppend)
+{
+    ObjectFileWriter writer( "objects.dat" );
+    const char*      str = "hello, world!";
+    writer.append( str, strlen( str ) );
+}
+
+TEST_F(TestObjectFile, TestAppendV)
+{
+    ObjectFileWriter writer( "objects.dat" );
+    const char*      str1 = "hello, world!";
+    const char*      str2 = "goodbye, cruel world.";
+
+    ::iovec buffers[2] = {{const_cast<char*>( str1 ), strlen( str1 )}, {const_cast<char*>( str2 ), strlen( str2 )}};
+    writer.append( buffers, 2 );
 }

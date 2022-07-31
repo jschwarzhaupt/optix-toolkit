@@ -58,7 +58,7 @@ ObjectFileWriter::ObjectFileWriter( const char* path )
 #endif
 
     // Open file.
-    m_descriptor = US( open )( path, US( O_WRONLY ) | US( O_APPEND ) | US( O_CREAT ) | US( O_TRUNC ), mode );
+    m_descriptor = US( open )( path, US( O_WRONLY ) | US( O_CREAT ) | US( O_TRUNC ), mode );
     if( m_descriptor < 0 )
     {
         throw Exception( "Cannot open object file", errno );
@@ -73,6 +73,35 @@ ObjectFileWriter::ObjectFileWriter( const char* path )
 ObjectFileWriter::~ObjectFileWriter()
 {
     US( close )( m_descriptor );
+}
+
+off_t ObjectFileWriter::append( const void* data, size_t size )
+{
+    ::iovec buffer = {const_cast<void*>( data ), size};
+    return append( &buffer, 1 );
+}
+
+off_t ObjectFileWriter::append( ::iovec* buffers, int numBuffers )
+{
+    // Sum buffer sizes.
+    size_t size = 0;
+    for( int i = 0; i < numBuffers; ++i )
+    {
+        size += buffers[i].iov_len;
+    }
+
+    // Extend file.
+    off_t end = lseek( m_descriptor, size, SEEK_END );
+    if( end < 0 )
+        throw Exception( "Failed to extend object store file", errno );
+
+    // Write buffers.
+    OTK_ASSERT(end >= size);
+    off_t begin = end - size;
+    ssize_t bytesWritten = pwritev( m_descriptor, buffers, numBuffers, begin );
+    if( bytesWritten != size )
+        throw Exception( "Error writing data to object store" );
+    return begin;
 }
 
 void ObjectFileWriter::synchronize()
