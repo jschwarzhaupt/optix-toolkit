@@ -26,39 +26,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#pragma once
+#include "AppendOnlyFile.h"
 
-#include <cstddef>
-#ifndef _WIN32
-#include <sys/uio.h>
-#endif
+#include <cstring>
 
-namespace otk {
+#include <gtest/gtest.h>
 
-class ObjectFileWriter
+using namespace otk;
+
+class TestAppendOnlyFile : public testing::Test
 {
-  public:
-    /// Construct ObjectFileWriter, creating or overwriting the specified file.  Throws
-    /// an exception if an error occurs.
-    explicit ObjectFileWriter( const char* path );
-
-    /// Destory ObjectFileWriter, closing the associated file.
-    ~ObjectFileWriter();
-
-    /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
-    /// exception if an error
-    off_t append( const void* data, size_t size );
-
-    /// Append the data from the given buffers. Returns the file offset of the data. Thread
-    /// safe. Throws an exception if an error occurs.
-    off_t append( ::iovec* buffers, int numBuffers );
-
-    /// Synchronize, ensuring that data from previous operations is written to disk (using
-    /// fsyncdata).  Data from any concurrent operations is not guaranteed to be synchronized.
-    void synchronize();
-
-  private:
-    int m_descriptor;
 };
 
-}  // namespace otk
+TEST_F(TestAppendOnlyFile, TestCtors)
+{
+    AppendOnlyFile file("objects.dat");
+}
+
+TEST_F(TestAppendOnlyFile, TestAppend)
+{
+    AppendOnlyFile file( "objects.dat" );
+    const char*      str = "hello, world!";
+    file.append( str, strlen( str ) );
+}
+
+TEST_F(TestAppendOnlyFile, TestAppendV)
+{
+    AppendOnlyFile file( "objects.dat" );
+    const char*      str1 = "hello, world!";
+    const char*      str2 = "goodbye, cruel world.";
+
+    ::iovec buffers[2] = {{const_cast<char*>( str1 ), strlen( str1 )}, {const_cast<char*>( str2 ), strlen( str2 )}};
+    file.append( buffers, 2 );
+}

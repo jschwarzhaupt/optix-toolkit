@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectFileWriter.h"
+#include "AppendOnlyFile.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 #include <OptiXToolkit/Util/Exception.h>
@@ -43,14 +43,14 @@ ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, 
     std::filesystem::create_directory( directory ); // throws on error
 
     std::filesystem::path filename( std::filesystem::path(directory) / "objects.dat" );
-    m_file.reset( new ObjectFileWriter( filename.string().c_str() ) );
+    m_file.reset( new AppendOnlyFile( filename.string().c_str() ) );
 
     synchronize();
 }
 
 ObjectStoreWriter::~ObjectStoreWriter()
 {
-    // The file is closed by ~ObjectFileWriter.
+    // The file is closed by ~AppendOnlyFile.
 }
 
 void ObjectStoreWriter::synchronize()

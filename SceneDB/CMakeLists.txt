@@ -39,7 +39,7 @@ include(GNUInstallDirs)
 include(../CMake/BuildConfig.cmake)
 
 add_library(SceneDB SHARED
-  src/ObjectFileWriter.cpp
+  src/AppendOnlyFile.cpp
   src/ObjectStoreReader.cpp
   src/ObjectStoreWriter.cpp
   )
@@ -58,7 +58,7 @@ target_sources(SceneDB
 )
 
 source_group( "Header Files\\Implementation" FILES
-  src/ObjectFileWriter.h
+  src/AppendOnlyFile.h
 )
 
 target_include_directories(SceneDB PUBLIC

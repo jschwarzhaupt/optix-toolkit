@@ -70,7 +70,7 @@ class ObjectStoreWriter
     void synchronize();
 
   private:
-    std::unique_ptr<class ObjectFileWriter> m_file;
+    std::unique_ptr<class AppendOnlyFile> m_file;
 };
 
 }  // namespace otk

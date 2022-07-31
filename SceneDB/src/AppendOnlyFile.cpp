@@ -26,8 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectFileWriter.h"
-#include "ObjectFile.h"
+#include "AppendOnlyFile.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -48,7 +47,7 @@
 
 namespace otk {
 
-ObjectFileWriter::ObjectFileWriter( const char* path )
+AppendOnlyFile::AppendOnlyFile( const char* path )
 {
     // File permissions
 #ifdef WIN32
@@ -61,27 +60,22 @@ ObjectFileWriter::ObjectFileWriter( const char* path )
     m_descriptor = US( open )( path, US( O_WRONLY ) | US( O_CREAT ) | US( O_TRUNC ), mode );
     if( m_descriptor < 0 )
     {
-        throw Exception( "Cannot open object file", errno );
+        throw Exception( "Cannot open AppendOnlyFile", errno );
     }
-
-    // Write header and synchronize.
-    ObjectFileHeader header;
-    US( write )( m_descriptor, &header, sizeof( header ) );
-    synchronize();
 }
 
-ObjectFileWriter::~ObjectFileWriter()
+AppendOnlyFile::~AppendOnlyFile()
 {
     US( close )( m_descriptor );
 }
 
-off_t ObjectFileWriter::append( const void* data, size_t size )
+off_t AppendOnlyFile::append( const void* data, size_t size )
 {
     ::iovec buffer = {const_cast<void*>( data ), size};
     return append( &buffer, 1 );
 }
 
-off_t ObjectFileWriter::append( ::iovec* buffers, int numBuffers )
+off_t AppendOnlyFile::append( ::iovec* buffers, int numBuffers )
 {
     // Sum buffer sizes.
     size_t size = 0;
@@ -93,18 +87,18 @@ off_t ObjectFileWriter::append( ::iovec* buffers, int numBuffers )
     // Extend file.
     off_t end = lseek( m_descriptor, size, SEEK_END );
     if( end < 0 )
-        throw Exception( "Failed to extend object store file", errno );
+        throw Exception( "Failed to extend AppendOnlyFile", errno );
 
     // Write buffers.
     OTK_ASSERT(end >= size);
     off_t begin = end - size;
     ssize_t bytesWritten = pwritev( m_descriptor, buffers, numBuffers, begin );
     if( bytesWritten != size )
-        throw Exception( "Error writing data to object store" );
+        throw Exception( "Error writing data to AppendOnlyFile" );
     return begin;
 }
 
-void ObjectFileWriter::synchronize()
+void AppendOnlyFile::synchronize()
 {
 #ifdef WIN32
     int status = _commit( m_descriptor );
@@ -113,7 +107,7 @@ void ObjectFileWriter::synchronize()
 #endif
     if( status )
     {
-        throw Exception( "Failed to synchronize object store file", errno );
+        throw Exception( "Failed to synchronize AppendOnlyFile", errno );
     }
 }
 
