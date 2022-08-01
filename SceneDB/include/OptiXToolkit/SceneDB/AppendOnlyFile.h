@@ -30,10 +30,9 @@
 
 #include <OptiXToolkit/SceneDB/Buffer.h>
 
+#include <atomic>
 #include <cstddef>
-#ifndef _WIN32
-#include <sys/uio.h>
-#endif
+#include <sys/types.h>
 
 namespace otk {
 
@@ -67,8 +66,15 @@ class AppendOnlyFile
     /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
     void flush();
 
+    /// Copying is prohibited.
+    AppendOnlyFile(const AppendOnlyFile&) = delete;
+
+    /// Assignment is prohibited.
+    AppendOnlyFile& operator=(const AppendOnlyFile&) = delete;
+
   private:
-    int m_descriptor;
+    int                m_descriptor;
+    std::atomic<off_t> m_offset{0};
 };
 
 }  // namespace otk

@@ -34,6 +34,7 @@
 #ifdef WIN32
 #include <io.h>
 #else
+#include <sys/uio.h>
 #include <unistd.h>
 #endif
 
@@ -70,18 +71,19 @@ AppendOnlyFile::~AppendOnlyFile()
 
 off_t AppendOnlyFile::appendV( const Buffer* buffers, int numBuffers )
 {
+    // Calculate the object size.
     size_t size = sumBufferSizes( buffers, numBuffers );
-    // Extend file.
-    off_t end = lseek( m_descriptor, size, SEEK_END );
-    if( end < 0 )
-        throw Exception( "Failed to extend AppendOnlyFile", errno );
 
-    // Write buffers.
-    OTK_ASSERT(end >= size);
-    off_t begin = end - size;
+    // Reserve space for the object using an atomic add to fetch the current offset and increment
+    // it by the object size.
+    off_t begin = m_offset.fetch_add( size );
+
+    // Write the object at the reserved offset, using pwritev() to concatenate the given buffers.
     ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( buffers ), numBuffers, begin );
     if( bytesWritten != size )
         throw Exception( "Error writing data to AppendOnlyFile" );
+
+    // Return the offset of the object data.
     return begin;
 }
 
