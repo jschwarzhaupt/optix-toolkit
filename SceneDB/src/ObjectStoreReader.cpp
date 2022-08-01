@@ -28,13 +28,27 @@
 
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
 
+#include "FileReader.h"
+
 #include <OptiXToolkit/Util/Exception.h>
+
+#include <filesystem>
+
+using path = std::filesystem::path;
 
 namespace otk {
 
 ObjectStoreReader::ObjectStoreReader( const char* directory, bool pollForUpdates )
 {
     OTK_ASSERT_MSG( !pollForUpdates, "ObjectStoreReader polling is TBD." );
+
+    m_objects.reset( new FileReader( ( path( directory ) / "objects.dat" ).string().c_str() ) );
+
+    // TODO: create index from object info
+}
+
+ObjectStoreReader::~ObjectStoreReader()
+{
 }
 
 } // namespace otk

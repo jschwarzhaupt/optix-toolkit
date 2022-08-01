@@ -40,9 +40,12 @@ class ObjectStoreReader
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
-    /// Construct ObjectStoreReader from files in the specified directory.  Optionally spawns a
-    /// thread that polls the filesystem for updates. Throws an exception if an error occurs.
+    /// Construct ObjectStoreReader from files in the specified directory. Throws an exception if an error occurs.
+    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
     ObjectStoreReader( const char* directory, bool pollForUpdates = false );
+
+    /// Destroy ObjectStoreReader, closing any associated files.
+    ~ObjectStoreReader();
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer (up to the given size) and returning the object size via result parameter.
@@ -53,6 +56,9 @@ class ObjectStoreReader
     /// object data, along with its size (via result parameter).  Returns an empty pointer if the
     /// specified key was not found.  Thread safe.
     std::unique_ptr<char> find( Key key, size_t& resultSize );
+
+  private:
+    std::unique_ptr<class FileReader> m_objects;
 };
 
 }  // namespace otk

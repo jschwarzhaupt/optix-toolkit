@@ -50,6 +50,10 @@ ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, 
     m_objectInfo.reset( new AppendOnlyFile( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
 }
 
+ObjectStoreWriter::~ObjectStoreWriter()
+{
+}
+
 void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers )
 {
     // TODO: discard if duplicate.

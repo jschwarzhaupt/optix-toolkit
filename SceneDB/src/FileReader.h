@@ -26,52 +26,23 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectInfoMap.h"
+#pragma once
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+#include <sys/types.h>
 
-#include <gtest/gtest.h>
+namespace otk {
 
-using namespace otk;
-
-class TestObjectStore : public testing::Test
+class FileReader
 {
+  public:
+    FileReader( const char* path );
+
+    ~FileReader();
+
+    void read( off_t offset, size_t size, void* dest );
+
+  private:
+    int m_descriptor;
 };
 
-TEST_F(TestObjectStore, TestCtors)
-{
-    ObjectStoreWriter writer("_store");
-    ObjectStoreReader reader("_store");
-}
-
-TEST_F(TestObjectStore, TestInsert)
-{
-    ObjectStoreWriter writer("_store");
-    const char* str = "Hello, world!";
-    writer.insert( 1, str, strlen( str ) );
-}
-
-TEST_F(TestObjectStore, TestObjectInfoMap)
-{
-    ObjectStoreWriter writer("_testObjectInfoStore");
-    const char* str1 = "Hello, world!";
-    const char* str2 = "Goodbye, cruel world.";
-    writer.insert( 1, str1, strlen( str1 ) );
-    writer.insert( 2, str2, strlen( str2 ) );
-    writer.synchronize();
-
-    ObjectInfoMap infoMap( "_testObjectInfoStore/objectInfo.dat" );
-
-    ObjectInfo* info = infoMap.find( 1 );
-    ASSERT_TRUE( info != nullptr );
-    EXPECT_EQ( 1, info->key );
-    EXPECT_EQ( 0, info->offset );
-    EXPECT_EQ( strlen( str1 ), info->size );
-
-    info = infoMap.find( 2 );
-    ASSERT_TRUE( info != nullptr );
-    EXPECT_EQ( 2, info->key );
-    EXPECT_EQ( strlen( str1 ), info->offset );
-    EXPECT_EQ( strlen( str2 ), info->size );
-}
+}  // namespace otk

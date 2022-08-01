@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
 #include <OptiXToolkit/SceneDB/Buffer.h>
 
 #include <cstddef>
@@ -54,6 +53,9 @@ class ObjectStoreWriter
     /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
     explicit ObjectStoreWriter( const char* directory, size_t bufferSize = 0, bool discardDuplicates = false );
 
+    /// Destroy ObjectStoreWriter, closing any associated files.
+    ~ObjectStoreWriter();
+    
     /// Insert an object with the specified key, concatenating the object data from multiple
     /// buffers, each of which is specified by a data pointer and size.  Thread safe. Throws an
     /// exception if an error occurs.
@@ -76,8 +78,8 @@ class ObjectStoreWriter
     void synchronize();
 
   private:
-    std::unique_ptr<AppendOnlyFile> m_objects;
-    std::unique_ptr<AppendOnlyFile> m_objectInfo;
+    std::unique_ptr<class AppendOnlyFile> m_objects;
+    std::unique_ptr<class AppendOnlyFile> m_objectInfo;
     std::vector<Buffer>             m_buffers;  // amortizes allocation cost
 };
 
