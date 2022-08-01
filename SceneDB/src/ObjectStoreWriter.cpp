@@ -54,14 +54,14 @@ ObjectStoreWriter::~ObjectStoreWriter()
 {
 }
 
-void ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
+bool ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Optionally discard objects with duplicate keys (i.e. when key is a content-based addresses).
     if( m_discardDuplicates )
     {
         std::unique_lock lock( m_keysMutex );
         if( m_keys.find( key ) != m_keys.end() )
-            return;  // TODO: return indication of deduplication?
+            return false;
         m_keys.insert( key );
     }
 
@@ -72,6 +72,7 @@ void ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDa
     // Append a record to the object info file specifying the key, offset, and size of the object.
     ObjectInfo info{ key, offset, size };
     m_objectInfo->append( &info, sizeof( ObjectInfo ) );
+    return true;
 }
 
 void ObjectStoreWriter::flush()

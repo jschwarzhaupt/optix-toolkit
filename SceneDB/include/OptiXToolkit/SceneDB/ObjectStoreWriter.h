@@ -53,16 +53,20 @@ class ObjectStoreWriter
     ~ObjectStoreWriter();
     
     /// Insert an object with the specified key, concatenating the object data from multiple data
-    /// blocks, each of which is specified by a data pointer and size.  Thread safe. Throws an
+    /// blocks, each of which specifies a data pointer and size.  Thread safe.  When the ObjectStore
+    /// has deduplication enabled, the insert call has no effect (returning false) if an object with
+    /// the same key was previously inserted (i.e. the key is a content-based address).  Throws an
     /// exception if an error occurs.
-    void insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks );
+    bool insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks );
 
-    /// Insert an object with the specified key. Thread safe. Throws an exception if an error
-    /// occurs.
-    void insert( Key key, const void* data, size_t size )
+    /// Insert an object with the specified key. Thread safe. When the ObjectStore has deduplication
+    /// enabled, the insert call has no effect (returning false) if an object with the same key was
+    /// previously inserted (i.e. the key is a content-based address).  Throws an exception if an
+    /// error occurs.
+    bool insert( Key key, const void* data, size_t size )
     {
         DataBlock dataBlock{data, size};
-        insertV( key, &dataBlock, 1 );
+        return insertV( key, &dataBlock, 1 );
     }
 
     /// Remove any object with the specified key. Thread safe. Throws an exception if an error
