@@ -26,8 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectInfoMap.h"
-
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
 
@@ -52,26 +50,25 @@ TEST_F(TestObjectStore, TestInsert)
     writer.insert( 1, str, strlen( str ) );
 }
 
-TEST_F(TestObjectStore, TestObjectInfoMap)
+TEST_F(TestObjectStore, TestWriteAndRead)
 {
-    ObjectStoreWriter writer("_testObjectInfoStore");
+    const char* store = "_store_testWriteAndRead";
+    ObjectStoreWriter writer(store);
     const char* str1 = "Hello, world!";
     const char* str2 = "Goodbye, cruel world.";
     writer.insert( 1, str1, strlen( str1 ) );
     writer.insert( 2, str2, strlen( str2 ) );
     writer.synchronize();
 
-    ObjectInfoMap infoMap( "_testObjectInfoStore/objectInfo.dat" );
+    ObjectStoreReader reader(store);
 
-    ObjectInfo* info = infoMap.find( 1 );
-    ASSERT_TRUE( info != nullptr );
-    EXPECT_EQ( 1, info->key );
-    EXPECT_EQ( 0, info->offset );
-    EXPECT_EQ( strlen( str1 ), info->size );
+    std::vector<char> buf1(strlen(str1)+1);
+    size_t size1;
+    EXPECT_TRUE( reader.find( 1, buf1.data(), buf1.size(), size1 ) );
+    buf1[strlen( str1 )] = '\0';
+    EXPECT_STREQ( str1, buf1.data() );
 
-    info = infoMap.find( 2 );
-    ASSERT_TRUE( info != nullptr );
-    EXPECT_EQ( 2, info->key );
-    EXPECT_EQ( strlen( str1 ), info->offset );
-    EXPECT_EQ( strlen( str2 ), info->size );
+    std::vector<char> buf2;
+    EXPECT_TRUE( reader.find( 2, buf2 ) );
+    EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
 }

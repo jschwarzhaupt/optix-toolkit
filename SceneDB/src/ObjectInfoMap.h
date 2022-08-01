@@ -46,7 +46,7 @@ class ObjectInfoMap
     ObjectInfoMap( const char* filename, bool pollForUpdates = false );
 
     /// Find ObjectInfo for the specified key.  Returns nullptr if not found.
-    ObjectInfo* find( Key key )
+    const ObjectInfo* find( Key key ) const
     {
         auto it = m_map.find( key );
         return it == m_map.end() ? nullptr : &it->second;

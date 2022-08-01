@@ -44,8 +44,10 @@ ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, 
     OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
     OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
 
-    std::filesystem::create_directory( directory ); // throws if error
+    // Create the specified directory if necessary. (Throws if an error occurs.)
+    std::filesystem::create_directory( directory );
 
+    // Create object data and info files.  The filenames must agree with the ObjectStoreReader.
     m_objects.reset( new AppendOnlyFile( ( path( directory ) / "objects.dat" ).string().c_str() ) );
     m_objectInfo.reset( new AppendOnlyFile( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
 }

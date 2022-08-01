@@ -26,10 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
-
 #include "FileReader.h"
+#include "ObjectInfoMap.h"
 
+#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
@@ -42,13 +42,44 @@ ObjectStoreReader::ObjectStoreReader( const char* directory, bool pollForUpdates
 {
     OTK_ASSERT_MSG( !pollForUpdates, "ObjectStoreReader polling is TBD." );
 
+    // Open the object data file and read the object info file.  The filenames must agree with the
+    // ObjectStoreWriter.
     m_objects.reset( new FileReader( ( path( directory ) / "objects.dat" ).string().c_str() ) );
-
-    // TODO: create index from object info
+    m_objectInfo.reset( new ObjectInfoMap( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
 }
 
 ObjectStoreReader::~ObjectStoreReader()
 {
 }
 
-} // namespace otk
+bool ObjectStoreReader::find( Key key, void* buffer, size_t bufferSize, size_t& resultSize )
+{
+    // Look up the key in the object info map.
+    const ObjectInfo* info = m_objectInfo->find( key );
+    if( !info )
+        return false;
+
+    // Read the object using the offset and size from the object info.
+    OTK_ASSERT( bufferSize >= info->offset );
+    resultSize = info->size;
+    m_objects->read( info->offset, info->size, buffer );
+    return true;
+}
+
+bool ObjectStoreReader::find( Key key, std::vector<char>& buffer )
+{
+    // Look up the key in the object info map.
+    const ObjectInfo* info = m_objectInfo->find( key );
+    if( !info )
+        false;
+
+    // Allocate storage for the object.
+    buffer.clear();
+    buffer.resize( info->size );
+
+    // Read the object using the offset and size from the object info.
+    m_objects->read( info->offset, info->size, buffer.data() );
+    return true;
+}
+
+}  // namespace otk

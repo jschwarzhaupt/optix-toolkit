@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace otk {
 
@@ -48,17 +49,17 @@ class ObjectStoreReader
     ~ObjectStoreReader();
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
-    /// into the given buffer (up to the given size) and returning the object size via result parameter.
-    /// Thread safe.
+    /// into the given buffer and returning the object size via result parameter.  Throws an exception
+    /// if the object size exceeds the buffer size.  Thread safe.
     bool find( Key key, void* buffer, size_t bufferSize, size_t& resultSize );
 
-    /// Find the object with the specified key.  If successful, returns a newly allocated buffer of
-    /// object data, along with its size (via result parameter).  Returns an empty pointer if the
-    /// specified key was not found.  Thread safe.
-    std::unique_ptr<char> find( Key key, size_t& resultSize );
+    /// Find the object with the specified key.  Returns true for success, copying the object data
+    /// into the given buffer (which is resized if necessary).  Thread safe.
+    bool find( Key key, std::vector<char>& buffer );
 
   private:
     std::unique_ptr<class FileReader> m_objects;
+    std::unique_ptr<class ObjectInfoMap> m_objectInfo;
 };
 
 }  // namespace otk
