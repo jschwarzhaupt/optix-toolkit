@@ -78,9 +78,9 @@ class ObjectStoreWriter
     /// occurs.
     void remove( Key key );
 
-    /// Synchronize, ensuring that data from previous operations is written to disk (using
-    /// fdatasync).  Data from any concurrent operations is not guaranteed to be synchronized.
-    void synchronize();
+    /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
+    /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
+    void flush();
 
   private:
     std::unique_ptr<class AppendOnlyFile> m_objects;

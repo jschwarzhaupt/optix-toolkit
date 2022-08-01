@@ -85,7 +85,7 @@ off_t AppendOnlyFile::appendV( const Buffer* buffers, int numBuffers )
     return begin;
 }
 
-void AppendOnlyFile::synchronize()
+void AppendOnlyFile::flush()
 {
 #ifdef WIN32
     int status = _commit( m_descriptor );
@@ -94,7 +94,7 @@ void AppendOnlyFile::synchronize()
 #endif
     if( status )
     {
-        throw Exception( "Failed to synchronize AppendOnlyFile", errno );
+        throw Exception( "Failed to flush AppendOnlyFile", errno );
     }
 }
 

@@ -76,10 +76,10 @@ void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers 
     m_objectInfo->append( &info, sizeof( ObjectInfo ) );
 }
 
-void ObjectStoreWriter::synchronize()
+void ObjectStoreWriter::flush()
 {
-    m_objects->synchronize();
-    m_objectInfo->synchronize();
+    m_objects->flush();
+    m_objectInfo->flush();
 }
 
 }  // namespace otk

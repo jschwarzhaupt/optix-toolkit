@@ -58,7 +58,7 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     const char* str2 = "Goodbye, cruel world.";
     writer.insert( 1, str1, strlen( str1 ) );
     writer.insert( 2, str2, strlen( str2 ) );
-    writer.synchronize();
+    writer.flush();
 
     ObjectStoreReader reader(store);
 
