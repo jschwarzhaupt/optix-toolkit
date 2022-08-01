@@ -32,7 +32,7 @@
 
 namespace otk {
 
-/// Buffer data and size.  Isomorphic to the Unix iovec struct used by pwritev.
+/** Buffer data and size.  Isomorphic to the Unix iovec struct used by pwritev. */
 struct Buffer
 {
     const void* data;

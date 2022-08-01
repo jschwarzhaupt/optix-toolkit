@@ -39,6 +39,9 @@
 
 namespace otk {
 
+/** ObjectStoreWriter stores arbitrarily sized objects, each with an associated key.  It supports
+    concurrent updates with no locking, with the proviso that only one process writes a particular
+    object store.  Multiple processes can read the object store (via ObjectStoreReader). */
 class ObjectStoreWriter
 {
   public:

@@ -35,13 +35,17 @@
 
 namespace otk {
 
+/** ObjectInfoMap is a map from Key to ObjectInfo, providing the file offset and size of each object
+    in an object store. */
 class ObjectInfoMap
 {
   public:
     using Key = uint64_t;
 
     /// Construct ObjectInfoMap, reading records from the specified file.  Throws an exception if an
-    /// error occurs.  \param pollForUpdates { If true, a thread is spawned that polls the
+    /// error occurs.  
+    /// \param filename { File containing ObjectInfo records. }
+    /// \param pollForUpdates { If true, a thread is spawned that polls the
     /// filesystem for updates. }
     ObjectInfoMap( const char* filename, bool pollForUpdates = false );
 

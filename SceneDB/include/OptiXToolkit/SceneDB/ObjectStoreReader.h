@@ -35,6 +35,10 @@
 
 namespace otk {
 
+/** ObjectStoreReader is a thread-safe reader for an object store created by ObjectStoreWriter.  The
+    implementation read a table of contents to create an index mapping each key to an object's size
+    and offset in the object file.  Multiple records can then be read concurrently from the object
+    file. */
 class ObjectStoreReader
 {
   public:
@@ -42,6 +46,7 @@ class ObjectStoreReader
     using Key = uint64_t;
 
     /// Construct ObjectStoreReader from files in the specified directory. Throws an exception if an error occurs.
+    /// \param directory { Directory containing object store. }
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
     ObjectStoreReader( const char* directory, bool pollForUpdates = false );
 

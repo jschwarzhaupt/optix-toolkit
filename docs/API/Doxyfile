@@ -31,8 +31,8 @@ FULL_PATH_NAMES        = NO
 STRIP_FROM_PATH        =
 STRIP_FROM_INC_PATH    =
 SHORT_NAMES            = NO
-JAVADOC_AUTOBRIEF      = NO
-QT_AUTOBRIEF           = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
 MULTILINE_CPP_IS_BRIEF = YES
 INHERIT_DOCS           = YES
 SEPARATE_MEMBER_PAGES  = NO
@@ -124,6 +124,8 @@ INPUT                  = \
   @CMAKE_SOURCE_DIR@/Gui/src \
   @CMAKE_SOURCE_DIR@/ImageSource/include/OptiXToolkit/ImageSource \
   @CMAKE_SOURCE_DIR@/ImageSource/src \
+  @CMAKE_SOURCE_DIR@/SceneDB/include/OptiXToolkit/SceneDB \
+  @CMAKE_SOURCE_DIR@/SceneDB/src \
   @CMAKE_SOURCE_DIR@/Util/include/OptiXToolkit/Util \
   @CMAKE_SOURCE_DIR@/Util/src
 INPUT_ENCODING         = UTF-8

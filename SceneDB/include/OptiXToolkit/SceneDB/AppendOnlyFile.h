@@ -37,9 +37,9 @@
 
 namespace otk {
 
-/// A lock-free, thread-safe, append-only file.  Append operations are accomplished by extending the
-/// file (using lseek) and then writing the data (using pwritev).  Not multiprocess-safe (because
-/// lseek does not modify the file on disk).
+/** A lock-free, thread-safe, append-only file.  Append operations are accomplished by extending the
+    file (using lseek) and then writing the data (using pwritev).  Not multiprocess-safe (because
+    lseek does not modify the file on disk). */
 class AppendOnlyFile
 {
   public:
