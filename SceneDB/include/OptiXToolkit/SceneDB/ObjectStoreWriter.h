@@ -33,6 +33,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <unordered_set>
 #include <vector>
 
 namespace otk {
@@ -80,7 +82,12 @@ class ObjectStoreWriter
   private:
     std::unique_ptr<class AppendOnlyFile> m_objects;
     std::unique_ptr<class AppendOnlyFile> m_objectInfo;
-    std::vector<Buffer>             m_buffers;  // amortizes allocation cost
+
+    std::vector<Buffer> m_buffers;  // amortizes allocation cost
+
+    const bool m_discardDuplicates = false;
+    std::unordered_set<Key> m_keys;
+    std::mutex m_keysMutex;
 };
 
 }  // namespace otk

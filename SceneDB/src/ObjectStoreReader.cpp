@@ -60,7 +60,7 @@ bool ObjectStoreReader::find( Key key, void* buffer, size_t bufferSize, size_t& 
         return false;
 
     // Read the object using the offset and size from the object info.
-    OTK_ASSERT( bufferSize >= info->offset );
+    OTK_ASSERT( bufferSize >= info->size );
     resultSize = info->size;
     m_objects->read( info->offset, info->size, buffer );
     return true;

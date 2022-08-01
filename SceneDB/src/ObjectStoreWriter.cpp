@@ -38,11 +38,11 @@
 using path = std::filesystem::path;
 
 namespace otk {
-    
+
 ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
+    : m_discardDuplicates( discardDuplicates )
 {
     OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
-    OTK_ASSERT_MSG( discardDuplicates == false, "ObjectStoreWriter deduplication is TBD" );
 
     // Create the specified directory if necessary. (Throws if an error occurs.)
     std::filesystem::create_directory( directory );
@@ -58,9 +58,15 @@ ObjectStoreWriter::~ObjectStoreWriter()
 
 void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers )
 {
-    // TODO: discard if duplicate.
-    // TODO: can update index before appending, since deduplication doesn't require offsets.
-    
+    // Optionally discard objects with duplicate keys (i.e. when key is a content-based addresses).
+    if( m_discardDuplicates )
+    {
+        std::unique_lock lock( m_keysMutex );
+        if( m_keys.find( key ) != m_keys.end() )
+            return;  // TODO: return indication of deduplication?
+        m_keys.insert( key );
+    }
+
 #if 1
     // Option 1: object file doesn't contains keys and sizes.
     off_t offset = m_objects->appendV( buffers, numBuffers );
@@ -75,16 +81,20 @@ void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers 
     m_buffers.push_back( Buffer{&key, sizeof( Key )} );
 
     // Construct a Buffer representing the size.
+    size_t size = sumBufferSizes( buffers, numBuffers );
     m_buffers.push_back( Buffer{&size, sizeof( size_t )} );
 
     // Copy the remaining Buffer structs
     m_buffers.insert( m_buffers.end(), buffers, buffers + numBuffers );
 
     // Append the buffers to the object file.
-    off_t offset = m_objects.appendV( m_buffers.data(), static_cast<int>( m_buffers.size() ) );
+    off_t offset = m_objects->appendV( m_buffers.data(), static_cast<int>( m_buffers.size() ) );
+
+    // Adjust the offset to skip the key and size.
+    offset += sizeof( Key ) + sizeof( size_t );
 #endif
 
-    // Write record to object log.
+    // Append a record to the object info file.
     ObjectInfo info{ key, offset, size };
     m_objectInfo->append( &info, sizeof( ObjectInfo ) );
 }
