@@ -56,11 +56,11 @@ class ObjectStoreReader
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer and returning the object size via result parameter.  Throws an exception
     /// if the object size exceeds the buffer size.  Thread safe.
-    bool find( Key key, void* buffer, size_t bufferSize, size_t& resultSize );
+    bool find( Key key, void* dest, size_t destSize, size_t& resultSize );
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer (which is resized if necessary).  Thread safe.
-    bool find( Key key, std::vector<char>& buffer );
+    bool find( Key key, std::vector<char>& dest );
 
   private:
     std::unique_ptr<class ObjectFileReader> m_objects;

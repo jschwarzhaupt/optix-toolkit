@@ -32,19 +32,19 @@
 
 namespace otk {
 
-/** Buffer data and size.  Isomorphic to the Unix iovec struct used by pwritev. */
-struct Buffer
+/** DataBlock bundles a data pointer and size.  Isomorphic to the Unix iovec struct used by pwritev. */
+struct DataBlock
 {
     const void* data;
     size_t      size;
 };
 
-inline size_t sumBufferSizes( const Buffer* buffers, int numBuffers )
+inline size_t sumDataBlockSizes( const DataBlock* dataBlocks, int count )
 {
     size_t size = 0;
-    for( int i = 0; i < numBuffers; ++i )
+    for( int i = 0; i < count; ++i )
     {
-        size += buffers[i].size;
+        size += dataBlocks[i].size;
     }
     return size;
 }

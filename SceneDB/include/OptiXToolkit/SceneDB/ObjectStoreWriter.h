@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/Buffer.h>
+#include <OptiXToolkit/SceneDB/DataBlock.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -61,17 +61,17 @@ class ObjectStoreWriter
     /// Destroy ObjectStoreWriter, closing any associated files.
     ~ObjectStoreWriter();
     
-    /// Insert an object with the specified key, concatenating the object data from multiple
-    /// buffers, each of which is specified by a data pointer and size.  Thread safe. Throws an
+    /// Insert an object with the specified key, concatenating the object data from multiple data
+    /// blocks, each of which is specified by a data pointer and size.  Thread safe. Throws an
     /// exception if an error occurs.
-    void insertV( Key key, const Buffer* buffers, int numBuffers );
+    void insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks );
 
     /// Insert an object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
     void insert( Key key, const void* data, size_t size )
     {
-        Buffer buffer{data, size};
-        insertV( key, &buffer, 1 );
+        DataBlock dataBlock{data, size};
+        insertV( key, &dataBlock, 1 );
     }
 
     /// Remove any object with the specified key. Thread safe. Throws an exception if an error
@@ -85,8 +85,6 @@ class ObjectStoreWriter
   private:
     std::unique_ptr<class AppendOnlyFile> m_objects;
     std::unique_ptr<class AppendOnlyFile> m_objectInfo;
-
-    std::vector<Buffer> m_buffers;  // amortizes allocation cost
 
     const bool m_discardDuplicates = false;
     std::unordered_set<Key> m_keys;

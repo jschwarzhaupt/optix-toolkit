@@ -56,6 +56,6 @@ TEST_F(TestAppendOnlyFile, TestAppendV)
     const char*    str1 = "hello, world!";
     const char*    str2 = "goodbye, cruel world.";
 
-    Buffer buffers[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
-    file.append( buffers, 2 );
+    DataBlock dataBlocks[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
+    file.append( dataBlocks, 2 );
 }

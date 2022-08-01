@@ -52,7 +52,7 @@ ObjectStoreReader::~ObjectStoreReader()
 {
 }
 
-bool ObjectStoreReader::find( Key key, void* buffer, size_t bufferSize, size_t& resultSize )
+bool ObjectStoreReader::find( Key key, void* dest, size_t destSize, size_t& resultSize )
 {
     // Look up the key in the object info map.
     const ObjectInfo* info = m_objectInfo->find( key );
@@ -60,13 +60,13 @@ bool ObjectStoreReader::find( Key key, void* buffer, size_t bufferSize, size_t& 
         return false;
 
     // Read the object using the offset and size from the object info.
-    OTK_ASSERT( bufferSize >= info->size );
+    OTK_ASSERT( destSize >= info->size );
     resultSize = info->size;
-    m_objects->read( info->offset, info->size, buffer );
+    m_objects->read( info->offset, info->size, dest );
     return true;
 }
 
-bool ObjectStoreReader::find( Key key, std::vector<char>& buffer )
+bool ObjectStoreReader::find( Key key, std::vector<char>& dest )
 {
     // Look up the key in the object info map.
     const ObjectInfo* info = m_objectInfo->find( key );
@@ -74,11 +74,11 @@ bool ObjectStoreReader::find( Key key, std::vector<char>& buffer )
         false;
 
     // Allocate storage for the object.
-    buffer.clear();
-    buffer.resize( info->size );
+    dest.clear();
+    dest.resize( info->size );
 
     // Read the object using the offset and size from the object info.
-    m_objects->read( info->offset, info->size, buffer.data() );
+    m_objects->read( info->offset, info->size, dest.data() );
     return true;
 }
 

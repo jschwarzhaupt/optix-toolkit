@@ -69,17 +69,17 @@ AppendOnlyFile::~AppendOnlyFile()
     US( close )( m_descriptor );
 }
 
-off_t AppendOnlyFile::appendV( const Buffer* buffers, int numBuffers )
+off_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Calculate the object size.
-    size_t size = sumBufferSizes( buffers, numBuffers );
+    size_t size = sumDataBlockSizes( dataBlocks, numDataBlocks );
 
     // Reserve space for the object using an atomic add to fetch the current offset and increment
     // it by the object size.
     off_t begin = m_offset.fetch_add( size );
 
-    // Write the object at the reserved offset, using pwritev() to concatenate the given buffers.
-    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( buffers ), numBuffers, begin );
+    // Write the object at the reserved offset, using pwritev() to concatenate the given data blocks.
+    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( dataBlocks ), numDataBlocks, begin );
     if( bytesWritten != size )
         throw Exception( "Error writing data to AppendOnlyFile" );
 

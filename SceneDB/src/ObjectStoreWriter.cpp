@@ -56,7 +56,7 @@ ObjectStoreWriter::~ObjectStoreWriter()
 {
 }
 
-void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers )
+void ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Optionally discard objects with duplicate keys (i.e. when key is a content-based addresses).
     if( m_discardDuplicates )
@@ -68,8 +68,8 @@ void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers 
     }
 
     // Append the object to the data file.
-    off_t offset = m_objects->appendV( buffers, numBuffers );
-    size_t size = sumBufferSizes( buffers, numBuffers );
+    off_t offset = m_objects->appendV( dataBlocks, numDataBlocks );
+    size_t size = sumDataBlockSizes( dataBlocks, numDataBlocks );
 
     // Append a record to the object info file specifying the key, offset, and size of the object.
     ObjectInfo info{ key, offset, size };

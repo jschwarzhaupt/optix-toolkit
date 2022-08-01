@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/Buffer.h>
+#include <OptiXToolkit/SceneDB/DataBlock.h>
 
 #include <atomic>
 #include <cstddef>
@@ -49,17 +49,17 @@ class AppendOnlyFile
     /// Destory AppendOnlyFile, closing the associated file.
     ~AppendOnlyFile();
 
-    /// Append the data from the given buffers, which are specified by structs containing a data
+    /// Append the data from the given data blocks, which are specified by structs containing a data
     /// pointer and size.  Returns the file offset of the data. Thread safe. Throws an exception if
     /// an error occurs.
-    off_t appendV( const Buffer* buffers, int numBuffers );
+    off_t appendV( const DataBlock* dataBlocks, int numDataBlocks );
 
     /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
     /// exception if an error occurs.
     off_t append( const void* data, size_t size )
     {
-        Buffer buffer{data, size};
-        return appendV( &buffer, 1 );
+        DataBlock dataBlock{data, size};
+        return appendV( &dataBlock, 1 );
     }
 
     /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
