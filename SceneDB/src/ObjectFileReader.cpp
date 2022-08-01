@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "FileReader.h"
+#include "ObjectFileReader.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -49,7 +49,7 @@
 
 namespace otk {
 
-FileReader::FileReader( const char* path )
+ObjectFileReader::ObjectFileReader( const char* path )
 {
     m_descriptor = US( open )( path, US( O_RDONLY ) );
     if( m_descriptor < 0 )
@@ -58,19 +58,19 @@ FileReader::FileReader( const char* path )
     }
 }
 
-FileReader::~FileReader()
+ObjectFileReader::~ObjectFileReader()
 {
     close( m_descriptor );
 }
 
-void FileReader::read( off_t offset, size_t size, void* dest )
+void ObjectFileReader::read( off_t offset, size_t size, void* dest )
 {
     // We assume system calls are automatically restarted when interrupted (sigacation SA_RESTART).
     ssize_t bytesRead = pread( m_descriptor, dest, size, offset );
     if( bytesRead < 0 )
-        throw Exception( "pread() call failed in FileReader", errno );
+        throw Exception( "pread() call failed in ObjectFileReader", errno );
     else if( bytesRead != size )
-        throw Exception( "Incomplete pread() call in FileReader" );
+        throw Exception( "Incomplete pread() call in ObjectFileReader" );
 }
 
 } // namespace otk

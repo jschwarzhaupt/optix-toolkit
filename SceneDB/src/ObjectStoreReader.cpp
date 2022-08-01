@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "FileReader.h"
+#include "ObjectFileReader.h"
 #include "ObjectInfoMap.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
@@ -44,7 +44,7 @@ ObjectStoreReader::ObjectStoreReader( const char* directory, bool pollForUpdates
 
     // Open the object data file and read the object info file.  The filenames must agree with the
     // ObjectStoreWriter.
-    m_objects.reset( new FileReader( ( path( directory ) / "objects.dat" ).string().c_str() ) );
+    m_objects.reset( new ObjectFileReader( ( path( directory ) / "objects.dat" ).string().c_str() ) );
     m_objectInfo.reset( new ObjectInfoMap( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
 }
 

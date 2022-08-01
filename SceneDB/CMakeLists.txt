@@ -40,7 +40,7 @@ include(../CMake/BuildConfig.cmake)
 
 add_library(SceneDB SHARED
   src/AppendOnlyFile.cpp
-  src/FileReader.cpp
+  src/ObjectFileReader.cpp
   src/ObjectInfoMap.cpp
   src/ObjectStoreReader.cpp
   src/ObjectStoreWriter.cpp
@@ -62,7 +62,7 @@ target_sources(SceneDB
   )
 
 source_group( "Header Files\\Implementation" FILES
-  src/FileReader.h
+  src/ObjectFileReader.h
   src/ObjectInfo.h
   src/ObjectInfoMap.h
   )

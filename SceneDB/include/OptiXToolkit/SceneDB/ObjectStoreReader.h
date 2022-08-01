@@ -63,7 +63,7 @@ class ObjectStoreReader
     bool find( Key key, std::vector<char>& buffer );
 
   private:
-    std::unique_ptr<class FileReader> m_objects;
+    std::unique_ptr<class ObjectFileReader> m_objects;
     std::unique_ptr<class ObjectInfoMap> m_objectInfo;
 };
 

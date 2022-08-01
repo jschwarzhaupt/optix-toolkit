@@ -32,13 +32,15 @@
 
 namespace otk {
 
-class FileReader
+/** ObjectFileReader simply encapsulates pread, allowing concurrent reads from an object file. */
+class ObjectFileReader
 {
   public:
-    FileReader( const char* path );
+    ObjectFileReader( const char* path );
 
-    ~FileReader();
+    ~ObjectFileReader();
 
+    /// Read an object with the specified size from the given offset into the given buffer.
     void read( off_t offset, size_t size, void* dest );
 
   private:

@@ -67,34 +67,11 @@ void ObjectStoreWriter::insertV( Key key, const Buffer* buffers, int numBuffers 
         m_keys.insert( key );
     }
 
-#if 1
-    // Option 1: object file doesn't contains keys and sizes.
+    // Append the object to the data file.
     off_t offset = m_objects->appendV( buffers, numBuffers );
     size_t size = sumBufferSizes( buffers, numBuffers );
-#else
-    // Option 2: object data is preceded by its key and size.  Multiple appends wouldn't be atomic,
-    // but we can append multiple buffers atomically.
-    m_buffers.clear();
-    m_buffers.reserve( numBuffers + 2 );  // this allocation is amortized.
 
-    // Construct a Buffer representing the key.
-    m_buffers.push_back( Buffer{&key, sizeof( Key )} );
-
-    // Construct a Buffer representing the size.
-    size_t size = sumBufferSizes( buffers, numBuffers );
-    m_buffers.push_back( Buffer{&size, sizeof( size_t )} );
-
-    // Copy the remaining Buffer structs
-    m_buffers.insert( m_buffers.end(), buffers, buffers + numBuffers );
-
-    // Append the buffers to the object file.
-    off_t offset = m_objects->appendV( m_buffers.data(), static_cast<int>( m_buffers.size() ) );
-
-    // Adjust the offset to skip the key and size.
-    offset += sizeof( Key ) + sizeof( size_t );
-#endif
-
-    // Append a record to the object info file.
+    // Append a record to the object info file specifying the key, offset, and size of the object.
     ObjectInfo info{ key, offset, size };
     m_objectInfo->append( &info, sizeof( ObjectInfo ) );
 }
