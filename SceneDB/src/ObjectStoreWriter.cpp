@@ -75,7 +75,7 @@ bool ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDa
     return true;
 }
 
-void ObjectStoreWriter::flush()
+void ObjectStoreWriter::flush() const
 {
     m_objects->flush();
     m_objectInfo->flush();

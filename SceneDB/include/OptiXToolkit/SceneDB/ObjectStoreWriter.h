@@ -75,7 +75,7 @@ class ObjectStoreWriter
 
     /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
     /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
-    void flush();
+    void flush() const;
 
   protected:
     friend class ObjectStore;

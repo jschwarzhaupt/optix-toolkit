@@ -30,8 +30,9 @@ include( ../../CMake/FetchGtest.cmake )
 
 add_executable( testSceneDB
   main.cpp
-  TestObjectStore.cpp
   TestAppendOnlyFile.cpp
+  TestObjectStore.cpp
+  TestObjectStoreThreading.cpp
   )  
 
 target_include_directories( testSceneDB PUBLIC
