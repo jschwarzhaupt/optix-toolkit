@@ -26,8 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
 
 #include <gtest/gtest.h>
 
@@ -37,38 +36,48 @@ class TestObjectStore : public testing::Test
 {
 };
 
-TEST_F(TestObjectStore, TestCtors)
+TEST_F(TestObjectStore, TestCreateDestroy)
 {
-    ObjectStoreWriter writer("_store");
-    ObjectStoreReader reader("_store");
+    ObjectStore store("_store");
+    auto writer = store.create();
+    EXPECT_TRUE( store.exists() );
+    writer.reset();
+    store.destroy();
 }
 
 TEST_F(TestObjectStore, TestInsert)
 {
-    ObjectStoreWriter writer("_store");
+    ObjectStore store("_store");
+    auto writer = store.create();
     const char* str = "Hello, world!";
-    writer.insert( 1, str, strlen( str ) );
+    writer->insert( 1, str, strlen( str ) );
+
+    writer.reset();
+    store.destroy();
 }
 
 TEST_F(TestObjectStore, TestWriteAndRead)
 {
-    const char* store = "_store_testWriteAndRead";
-    ObjectStoreWriter writer(store);
+    ObjectStore store( "_store_testWriteAndRead" );
+    auto writer = store.create();
     const char* str1 = "Hello, world!";
     const char* str2 = "Goodbye, cruel world.";
-    writer.insert( 1, str1, strlen( str1 ) );
-    writer.insert( 2, str2, strlen( str2 ) );
-    writer.flush();
+    writer->insert( 1, str1, strlen( str1 ) );
+    writer->insert( 2, str2, strlen( str2 ) );
+    writer.reset();
 
-    ObjectStoreReader reader(store);
+    auto reader = store.read();
 
     std::vector<char> buf1(strlen(str1)+1);
     size_t size1;
-    EXPECT_TRUE( reader.find( 1, buf1.data(), buf1.size(), size1 ) );
+    EXPECT_TRUE( reader->find( 1, buf1.data(), buf1.size(), size1 ) );
     buf1[strlen( str1 )] = '\0';
     EXPECT_STREQ( str1, buf1.data() );
 
     std::vector<char> buf2;
-    EXPECT_TRUE( reader.find( 2, buf2 ) );
+    EXPECT_TRUE( reader->find( 2, buf2 ) );
     EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
+
+    reader.reset();
+    store.destroy();
 }

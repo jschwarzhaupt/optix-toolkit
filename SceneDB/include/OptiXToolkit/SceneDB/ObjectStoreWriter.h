@@ -35,28 +35,19 @@
 #include <memory>
 #include <mutex>
 #include <unordered_set>
+#include <string>
 #include <vector>
 
 namespace otk {
 
-/** ObjectStoreWriter stores arbitrarily sized objects, each with an associated key.  It supports
-    concurrent updates with no locking, with the proviso that only one process writes a particular
-    object store.  Multiple processes can read the object store (via ObjectStoreReader). */
+/** ObjectStoreWriter is used to insert key/value pairs into an ObjectStore.  It supports concurrent
+    insertions with no locking, with the proviso that an ObjectStore has only one writer, and only one
+    process may write to the files for a particular object store. */
 class ObjectStoreWriter
 {
   public:
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
-
-    /// Construct ObjectStoreWriter.  Throws an exception if an error occurs.
-    /// \param directory { Name of directory to contain object store files.  Created if necessary
-    /// (using current umask).  Any existing object store files are removed. }
-    /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
-    /// never written.  The buffer is flushed when writing an object record that would overflow the
-    /// buffer.  (An object record includes the key and the object size.) }
-    /// \param discardDuplicates { When true, the ObjectStoreWriter discards insertions for keys
-    /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
-    explicit ObjectStoreWriter( const char* directory, size_t bufferSize = 0, bool discardDuplicates = false );
 
     /// Destroy ObjectStoreWriter, closing any associated files.
     ~ObjectStoreWriter();
@@ -81,6 +72,18 @@ class ObjectStoreWriter
     /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
     /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
     void flush();
+
+  protected:
+    friend class ObjectStore;
+
+    /// Use ObjectStore::create() to obtain an ObjectStoreWriter.
+    /// \param objectStore { The parent ObjectStore. }
+    /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
+    /// never written.  The buffer is flushed when writing an object record that would overflow the
+    /// buffer.  (An object record includes the key and the object size.) }
+    /// \param discardDuplicates { When true, the ObjectStoreWriter discards insertions for keys
+    /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
+    explicit ObjectStoreWriter( const class ObjectStore& objectStore, size_t bufferSize = 0, bool discardDuplicates = false );
 
   private:
     std::unique_ptr<class AppendOnlyFile> m_objects;

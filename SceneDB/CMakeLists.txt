@@ -42,6 +42,7 @@ add_library(SceneDB SHARED
   src/AppendOnlyFile.cpp
   src/ObjectFileReader.cpp
   src/ObjectInfoMap.cpp
+  src/ObjectStore.cpp
   src/ObjectStoreReader.cpp
   src/ObjectStoreWriter.cpp
   )
@@ -56,7 +57,8 @@ target_sources(SceneDB
   BASE_DIRS include
   FILES
   include/OptiXToolkit/SceneDB/AppendOnlyFile.h
-  include/OptiXToolkit/SceneDB/Buffer.h
+  include/OptiXToolkit/SceneDB/DataBlock.h
+  include/OptiXToolkit/SceneDB/ObjectStore.h
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h
   include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
   )

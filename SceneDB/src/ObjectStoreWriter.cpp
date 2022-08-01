@@ -27,6 +27,7 @@
 //
 
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
 
 #include "ObjectInfo.h"
 
@@ -39,17 +40,14 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( const char* directory, size_t bufferSize, bool discardDuplicates )
+ObjectStoreWriter::ObjectStoreWriter( const ObjectStore& objectStore, size_t bufferSize, bool discardDuplicates )
     : m_discardDuplicates( discardDuplicates )
 {
     OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
 
-    // Create the specified directory if necessary. (Throws if an error occurs.)
-    std::filesystem::create_directory( directory );
-
-    // Create object data and info files.  The filenames must agree with the ObjectStoreReader.
-    m_objects.reset( new AppendOnlyFile( ( path( directory ) / "objects.dat" ).string().c_str() ) );
-    m_objectInfo.reset( new AppendOnlyFile( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
+    // Create object data and info files.
+    m_objects.reset( new AppendOnlyFile( objectStore.getDataFile().string().c_str() ) );
+    m_objectInfo.reset( new AppendOnlyFile( objectStore.getIndexFile().string().c_str() ) );
 }
 
 ObjectStoreWriter::~ObjectStoreWriter()

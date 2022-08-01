@@ -30,6 +30,7 @@
 #include "ObjectInfoMap.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
@@ -38,14 +39,13 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreReader::ObjectStoreReader( const char* directory, bool pollForUpdates )
+ObjectStoreReader::ObjectStoreReader( const ObjectStore& objectStore, bool pollForUpdates )
 {
     OTK_ASSERT_MSG( !pollForUpdates, "ObjectStoreReader polling is TBD." );
 
-    // Open the object data file and read the object info file.  The filenames must agree with the
-    // ObjectStoreWriter.
-    m_objects.reset( new ObjectFileReader( ( path( directory ) / "objects.dat" ).string().c_str() ) );
-    m_objectInfo.reset( new ObjectInfoMap( ( path( directory ) / "objectInfo.dat" ).string().c_str() ) );
+    // Open the object data file and read the object info file.
+    m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );
+    m_objectInfo.reset( new ObjectInfoMap( objectStore.getIndexFile().string().c_str() ) );
 }
 
 ObjectStoreReader::~ObjectStoreReader()

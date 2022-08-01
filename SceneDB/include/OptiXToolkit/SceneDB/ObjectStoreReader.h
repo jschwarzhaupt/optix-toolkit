@@ -31,24 +31,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace otk {
 
-/** ObjectStoreReader is a thread-safe reader for an object store created by ObjectStoreWriter.  The
-    implementation read a table of contents to create an index mapping each key to an object's size
-    and offset in the object file.  Multiple records can then be read concurrently from the object
-    file. */
+/** ObjectStoreReader is a thread-safe reader for an ObjectStore.  The implementation reads a table
+    of contents to create an index mapping each key to an object's size and offset in the object
+    file.  Multiple records can then be read concurrently from the object file. */
 class ObjectStoreReader
 {
   public:
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
-
-    /// Construct ObjectStoreReader from files in the specified directory. Throws an exception if an error occurs.
-    /// \param directory { Directory containing object store. }
-    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
-    ObjectStoreReader( const char* directory, bool pollForUpdates = false );
 
     /// Destroy ObjectStoreReader, closing any associated files.
     ~ObjectStoreReader();
@@ -62,9 +57,17 @@ class ObjectStoreReader
     /// into the given buffer (which is resized if necessary).  Thread safe.
     bool find( Key key, std::vector<char>& dest );
 
+  protected:
+    friend class ObjectStore;
+
+    /// Use ObjectStore::read() to obtain an ObjectStoreReader.
+    /// \param objectStore { The parent ObjectStore. }
+    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
+    ObjectStoreReader( const class ObjectStore& objectStore, bool pollForUpdates = false );
+
   private:
     std::unique_ptr<class ObjectFileReader> m_objects;
-    std::unique_ptr<class ObjectInfoMap> m_objectInfo;
+    std::unique_ptr<class ObjectInfoMap>    m_objectInfo;
 };
 
 }  // namespace otk

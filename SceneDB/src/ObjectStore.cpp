@@ -26,39 +26,46 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
 
 #include <filesystem>
 
-#include <gtest/gtest.h>
+using path = std::filesystem::path;
 
-using namespace otk;
+namespace otk {
 
-class TestAppendOnlyFile : public testing::Test
+ObjectStore::ObjectStore( const char* directory )
+    : m_directory( directory )
+    , m_dataFile( m_directory / "objects.dat" )
+    , m_indexFile( m_directory / "index.dat" )
 {
-  public:
-    std::unique_ptr<AppendOnlyFile> m_file;
-
-    void SetUp() { m_file.reset( new AppendOnlyFile( "objects.dat" ) ); }
-
-    void TearDown()
-    {
-        m_file.reset();
-        std::filesystem::remove( "objects.dat" );
-    }
-};
-
-TEST_F(TestAppendOnlyFile, TestAppend)
-{
-    const char*    str = "hello, world!";
-    m_file->append( str, strlen( str ) );
 }
 
-TEST_F(TestAppendOnlyFile, TestAppendV)
+ObjectStore::~ObjectStore()
 {
-    const char*    str1 = "hello, world!";
-    const char*    str2 = "goodbye, cruel world.";
-
-    DataBlock dataBlocks[2] = {{str1, strlen( str1 )}, {str2, strlen( str2 )}};
-    m_file->append( dataBlocks, 2 );
 }
+
+bool ObjectStore::exists() const
+{
+    return std::filesystem::exists( m_dataFile ) && std::filesystem::exists( m_indexFile );
+}
+
+std::shared_ptr<ObjectStoreWriter> ObjectStore::create( size_t bufferSize, bool discardDuplicates )
+{
+    // Create the specified directory if necessary. (Throws if an error occurs.)
+    std::filesystem::create_directory( m_directory );
+
+    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriter( *this, bufferSize, discardDuplicates ) );
+}
+
+std::shared_ptr<ObjectStoreReader> ObjectStore::read( bool pollForUpdates )
+{
+    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReader( *this, pollForUpdates ) );
+}
+
+void ObjectStore::destroy()
+{
+    std::filesystem::remove_all( m_directory );
+}
+
+}  // namespace otk
