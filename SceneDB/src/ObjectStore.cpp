@@ -50,7 +50,7 @@ bool ObjectStore::exists() const
     return std::filesystem::exists( m_dataFile ) && std::filesystem::exists( m_indexFile );
 }
 
-std::shared_ptr<ObjectStoreWriter> ObjectStore::create( size_t bufferSize, bool discardDuplicates )
+std::shared_ptr<ObjectStoreWriter> ObjectStore::create( size_t bufferSize, bool discardDuplicates ) const
 {
     // Create the specified directory if necessary. (Throws if an error occurs.)
     std::filesystem::create_directory( m_directory );
@@ -58,7 +58,7 @@ std::shared_ptr<ObjectStoreWriter> ObjectStore::create( size_t bufferSize, bool 
     return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriter( *this, bufferSize, discardDuplicates ) );
 }
 
-std::shared_ptr<ObjectStoreReader> ObjectStore::read( bool pollForUpdates )
+std::shared_ptr<ObjectStoreReader> ObjectStore::read( bool pollForUpdates ) const
 {
     return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReader( *this, pollForUpdates ) );
 }

@@ -64,13 +64,13 @@ class ObjectStore
     /// buffer. }
     /// \param discardDuplicates { When true, inserting an object has no effect when its key
     /// is already stored.  This is useful when keys are content-based addresses (CBAs). }
-    std::shared_ptr<ObjectStoreWriter> create( size_t bufferSize = 0, bool discardDuplicates = false );
+    std::shared_ptr<ObjectStoreWriter> create( size_t bufferSize = 0, bool discardDuplicates = false ) const;
 
     /// Open the object store for reading.  Returns an ObjectStoreReader that can be used to read
     /// objects from the store.  The reader should be reused whenever possible, because creating a
     /// new reader can be expensive.
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
-    std::shared_ptr<ObjectStoreReader> read( bool pollForUpdates = false );
+    std::shared_ptr<ObjectStoreReader> read( bool pollForUpdates = false ) const;
 
     /// Check whether the object store has been created.
     bool exists() const;
