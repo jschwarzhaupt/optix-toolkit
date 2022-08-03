@@ -100,15 +100,16 @@ std::shared_ptr<ObjectStoreReader> ObjectStoreImpl::getReader( const ObjectStore
     return m_reader;
 }
 
-void ObjectStoreImpl::destroy()
+void ObjectStoreImpl::close()
 {
     std::unique_lock<std::mutex> lock( m_mutex );
-    OTK_ASSERT_MSG( !m_writer || m_writer.use_count() == 1,
-                    "Previous writer should be destroyed before destroying ObjectStore" );
-    OTK_ASSERT_MSG( !m_reader || m_reader.use_count() == 1,
-                    "Previous reader should be destroyed before destroying ObjectStore" );
     m_writer.reset();
     m_reader.reset();
+}
+
+void ObjectStoreImpl::destroy()
+{
+    close();
     std::filesystem::remove_all( path( m_options.directory ) );
 }
 

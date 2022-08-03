@@ -69,8 +69,11 @@ class ObjectStoreImpl : public ObjectStore
     /// Check whether the object store has been initialized via getWriter().
     bool exists() const override;
 
-    /// Destroy the object store, removing any associated disk files.  Any previously created
-    /// writers or readers should be destroyed before calling destroy().
+    /// Close the object store, releasing any reader and writer instances.
+    void close() override;
+
+    /// Destroy the object store, closing it if necessary and removing any associated disk files.
+    /// Any previously created writers or readers should be destroyed before calling destroy().
     void destroy() override;
 
   protected:

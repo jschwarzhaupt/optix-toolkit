@@ -76,6 +76,9 @@ class ObjectStore
     /// Check whether the object store has been initialized via getWriter().
     virtual bool exists() const = 0;
 
+    /// Close the object store, releasing any reader and writer instances.
+    virtual void close() = 0;
+
     /// Destroy the object store, removing any associated disk files.  Any previously created
     /// writers or readers should be destroyed before calling destroy().
     virtual void destroy() = 0;
