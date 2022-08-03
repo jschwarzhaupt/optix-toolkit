@@ -60,8 +60,17 @@ void ObjectMetadataMap::readMetadata( const char* filename )
                 return; // EOF
 
         }
-        // Map key to ObjectMetadata.
-        m_map[metadata.key] = metadata;
+
+        // Special case: a sentinel offset value denotes object removal.
+        if (metadata.offset == ObjectMetadata::REMOVED)
+        {
+            m_map.erase( metadata.key );
+        }
+        else
+        {
+            // Map key to ObjectMetadata.
+            m_map[metadata.key] = metadata;
+        }
     }
 }
 

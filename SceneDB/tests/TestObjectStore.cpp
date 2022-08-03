@@ -82,3 +82,32 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     reader.reset();
     m_store->destroy();
 }
+
+TEST_F(TestObjectStore, TestRemove)
+{
+    auto writer = m_store->getWriter();
+    const char* str1 = "Hello, world!";
+    const char* str2 = "Goodbye, cruel world.";
+    const char* str3 = "What a wonderful world.";
+    writer->insert( 1, str1, strlen( str1 ) );
+    writer->insert( 2, str2, strlen( str2 ) );
+    writer->remove( 1 );
+    writer->insert( 1, str3, strlen( str3 ) );
+    writer->remove( 2 );
+    writer.reset();
+
+    auto reader = m_store->getReader();
+
+    std::vector<char> buf1(strlen(str3)+1);
+    size_t size1;
+    EXPECT_TRUE( reader->find( 1, buf1.data(), buf1.size(), size1 ) );
+    buf1[strlen( str3 )] = '\0';
+    EXPECT_STREQ( str3, buf1.data() );
+
+    std::vector<char> buf2;
+    EXPECT_FALSE( reader->find( 2, buf2 ) );
+
+    reader.reset();
+    m_store->destroy();
+
+}

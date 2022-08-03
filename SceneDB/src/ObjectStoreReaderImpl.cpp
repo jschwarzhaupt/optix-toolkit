@@ -60,30 +60,30 @@ ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
 bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
 {
     // Look up the key in the object metadata map.
-    const ObjectMetadata* metadata = m_metadata->find( key );
-    if( !metadata )
+    ObjectMetadata metadata;
+    if( !m_metadata->find( key, &metadata ) )
         return false;
 
     // Read the object using the offset and size from the object metadata.
-    OTK_ASSERT( destSize >= metadata->size );
-    resultSize = metadata->size;
-    m_objects->read( metadata->offset, metadata->size, dest );
+    OTK_ASSERT( destSize >= metadata.size );
+    resultSize = metadata.size;
+    m_objects->read( metadata.offset, metadata.size, dest );
     return true;
 }
 
 bool ObjectStoreReaderImpl::find( Key key, std::vector<char>& dest )
 {
     // Look up the key in the object metadata map.
-    const ObjectMetadata* metadata = m_metadata->find( key );
-    if( !metadata )
-        false;
+    ObjectMetadata metadata;
+    if( !m_metadata->find( key, &metadata ) )
+        return false;
 
     // Allocate storage for the object.
     dest.clear();
-    dest.resize( metadata->size );
+    dest.resize( metadata.size );
 
     // Read the object using the offset and size from the object metadata.
-    m_objects->read( metadata->offset, metadata->size, dest.data() );
+    m_objects->read( metadata.offset, metadata.size, dest.data() );
     return true;
 }
 

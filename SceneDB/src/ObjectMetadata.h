@@ -30,6 +30,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <limits>
 #include <sys/types.h>
 
 namespace sceneDB {
@@ -39,6 +40,9 @@ struct ObjectMetadata
     uint64_t key;
     off_t    offset;
     size_t   size;
+
+    /// This invalid file offset denotes object removal.
+    static const off_t REMOVED = std::numeric_limits<off_t>::max();
 };
     
 } // namespace sceneDB

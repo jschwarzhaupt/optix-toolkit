@@ -30,6 +30,8 @@
 
 #include "ObjectMetadata.h"
 
+#include <OptiXToolkit/Util/Exception.h>
+
 #include <cstdint>
 #include <unordered_map>
 
@@ -49,15 +51,19 @@ class ObjectMetadataMap
     /// filesystem for updates. }
     ObjectMetadataMap( const char* filename, bool pollForUpdates = false );
 
-    /// Find ObjectMetadata for the specified key.  Returns nullptr if not found.
-    const ObjectMetadata* find( Key key ) const
+    /// Find ObjectMetadata for the specified key.  Returns true if found and returns the metadata
+    /// via result parameter.
+    bool find( Key key, ObjectMetadata* result ) const
     {
         auto it = m_map.find( key );
-        return it == m_map.end() ? nullptr : &it->second;
-        // TODO: is it safe to return reference to an entry in an unordered_map?
+        if( it == m_map.end() )
+            return false;
+
+        *result = it->second;
+        return true;
     }
 
-private:
+  private:
     std::unordered_map<Key, ObjectMetadata> m_map;
 
     void readMetadata( const char* filename );

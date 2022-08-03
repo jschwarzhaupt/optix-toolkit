@@ -80,8 +80,17 @@ bool ObjectStoreWriterImpl::insertV( Key key, const DataBlock* dataBlocks, int n
 
 void ObjectStoreWriterImpl::remove( Key key )
 {
-    // TODO
-    OTK_ASSERT_MSG( false, "ObjectStoreWriterImpl::remove is TBD" );
+    // Append a record to the object metadata file with a sentinel offset that denotes removal.
+    ObjectMetadata metadata{ key, ObjectMetadata::REMOVED, 0 };
+    m_metadata->append( &metadata, sizeof( ObjectMetadata ) );
+
+    // If deduplication is enabled, update the set of keys to ensure that future inserts will not be
+    // discarded.
+    if( m_options.discardDuplicates )
+    {
+        std::unique_lock lock( m_keysMutex );
+        m_keys.erase( key );
+    }
 }
 
 void ObjectStoreWriterImpl::flush()
