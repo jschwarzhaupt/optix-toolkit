@@ -34,7 +34,7 @@
 
 using path = std::filesystem::path;
 
-namespace otk {
+namespace sceneDB {
 
 std::shared_ptr<ObjectStore> ObjectStore::getInstance( const Options& options )
 {
@@ -113,4 +113,4 @@ void ObjectStoreImpl::destroy()
     std::filesystem::remove_all( path( m_options.directory ) );
 }
 
-}  // namespace otk
+}  // namespace sceneDB

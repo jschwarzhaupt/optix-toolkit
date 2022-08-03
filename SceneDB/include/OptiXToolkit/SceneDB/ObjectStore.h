@@ -34,7 +34,7 @@
 #include <memory>
 #include <string>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStore stores arbitrarily sized objects, each with an associated key.  It supports
     concurrent updates with no locking, with the proviso that only one process writes a particular
@@ -84,4 +84,4 @@ class ObjectStore
     virtual void destroy() = 0;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

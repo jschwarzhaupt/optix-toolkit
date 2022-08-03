@@ -33,7 +33,7 @@
 #include <cstdint>
 #include <unordered_map>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectMetadata is a map from Key to ObjectMetadata, providing the file offset and size of each object
     in an object store. */
@@ -63,4 +63,4 @@ private:
     void readMetadata( const char* filename );
 };
 
-}  // namespace otk
+}  // namespace sceneDB

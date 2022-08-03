@@ -37,7 +37,7 @@
 
 using path = std::filesystem::path;
 
-namespace otk {
+namespace sceneDB {
 
 ObjectStoreReader::~ObjectStoreReader()
 {
@@ -87,4 +87,4 @@ bool ObjectStoreReaderImpl::find( Key key, std::vector<char>& dest )
     return true;
 }
 
-}  // namespace otk
+}  // namespace sceneDB

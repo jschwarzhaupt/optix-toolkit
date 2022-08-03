@@ -32,7 +32,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace otk;
+using namespace sceneDB;
 
 class TestAppendOnlyFile : public testing::Test
 {

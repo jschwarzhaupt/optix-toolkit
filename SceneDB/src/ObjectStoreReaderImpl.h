@@ -32,7 +32,7 @@
 
 #include <memory>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStoreReader is a thread-safe reader for an ObjectStore.  The implementation reads a table
     of contents to create an index mapping each key to an object's size and offset in the object
@@ -69,4 +69,4 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
     std::unique_ptr<class ObjectMetadataMap> m_metadata;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

@@ -34,7 +34,7 @@
 #include <cstddef>
 #include <sys/types.h>
 
-namespace otk {
+namespace sceneDB {
 
 /** A lock-free, thread-safe, append-only file.  Append operations are accomplished by extending the
     file (using lseek) and then writing the data (using pwritev).  Not multiprocess-safe (because
@@ -77,4 +77,4 @@ class AppendOnlyFile
     std::atomic<off_t> m_offset{0};
 };
 
-}  // namespace otk
+}  // namespace sceneDB

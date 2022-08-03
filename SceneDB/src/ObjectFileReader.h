@@ -30,7 +30,7 @@
 
 #include <sys/types.h>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectFileReader simply encapsulates pread, allowing concurrent reads from an object file. */
 class ObjectFileReader
@@ -47,4 +47,4 @@ class ObjectFileReader
     int m_descriptor;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

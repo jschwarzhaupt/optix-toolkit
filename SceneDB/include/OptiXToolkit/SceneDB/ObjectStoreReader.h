@@ -32,7 +32,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStoreReader is a thread-safe reader for an ObjectStore. */
 class ObjectStoreReader
@@ -64,4 +64,4 @@ class ObjectStoreReader
     virtual bool find( Key key, std::vector<char>& dest ) = 0;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

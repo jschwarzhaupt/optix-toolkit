@@ -30,7 +30,7 @@
 
 #include <cstddef>
 
-namespace otk {
+namespace sceneDB {
 
 /** DataBlock bundles a data pointer and size.  Isomorphic to the Unix iovec struct used by pwritev. */
 struct DataBlock
@@ -49,4 +49,4 @@ inline size_t sumDataBlockSizes( const DataBlock* dataBlocks, int count )
     return size;
 }
 
-} // namespace otk
+} // namespace sceneDB

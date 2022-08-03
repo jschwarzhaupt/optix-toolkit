@@ -38,7 +38,7 @@
 #include <memory>
 #include <mutex>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStoreImpl implements the abstract ObjectStore base class. */
 class ObjectStoreImpl : public ObjectStore
@@ -93,4 +93,4 @@ class ObjectStoreImpl : public ObjectStore
     std::shared_ptr<ObjectStoreReaderImpl> m_reader;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

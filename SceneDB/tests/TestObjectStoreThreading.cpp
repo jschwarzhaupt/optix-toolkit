@@ -46,7 +46,7 @@
 #define PRINTF_STATS
 #endif
 
-using namespace otk;
+using namespace sceneDB;
 
 class Stopwatch
 {

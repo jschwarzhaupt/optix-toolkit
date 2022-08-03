@@ -30,7 +30,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace otk;
+using namespace sceneDB;
 
 class TestObjectStore : public testing::Test
 {

@@ -30,7 +30,7 @@
 
 #include <OptiXToolkit/Util/Exception.h>
 
-namespace otk {
+namespace sceneDB {
 
 ObjectMetadataMap::ObjectMetadataMap( const char* filename, bool pollForUpdates )
 {
@@ -43,7 +43,7 @@ void ObjectMetadataMap::readMetadata( const char* filename )
     // Open the object metadata file.
     FILE* file = fopen( filename, "rb" );
     if( file == nullptr )
-        throw Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+        throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
 
     // Read records (using buffered I/O), updating the map.  For now we stop
     // when EOF is encountered, rather than continuing to poll for updates.
@@ -55,7 +55,7 @@ void ObjectMetadataMap::readMetadata( const char* filename )
         if (itemsRead < 1)
         {
             if (ferror(file))
-                throw Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
+                throw otk::Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
             else
                 return; // EOF
 
@@ -65,4 +65,4 @@ void ObjectMetadataMap::readMetadata( const char* filename )
     }
 }
 
-} // namespace otk
+} // namespace sceneDB

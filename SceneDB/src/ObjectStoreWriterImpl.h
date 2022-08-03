@@ -37,7 +37,7 @@
 #include <string>
 #include <vector>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStoreWriter is used to insert key/value pairs into an ObjectStore.  It supports concurrent
     insertions with no locking, with the proviso that an ObjectStore has only one writer, and only one
@@ -91,4 +91,4 @@ class ObjectStoreWriterImpl : public ObjectStoreWriter
     std::mutex m_keysMutex;
 };
 
-}  // namespace otk
+}  // namespace sceneDB

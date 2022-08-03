@@ -37,7 +37,7 @@
 
 using path = std::filesystem::path;
 
-namespace otk {
+namespace sceneDB {
 
 ObjectStoreWriter::~ObjectStoreWriter()
 {
@@ -90,4 +90,4 @@ void ObjectStoreWriterImpl::flush()
     m_metadata->flush();
 }
 
-}  // namespace otk
+}  // namespace sceneDB

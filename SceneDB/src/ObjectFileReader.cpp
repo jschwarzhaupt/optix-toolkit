@@ -47,14 +47,14 @@
 #define US( x ) x
 #endif
 
-namespace otk {
+namespace sceneDB {
 
 ObjectFileReader::ObjectFileReader( const char* path )
 {
     m_descriptor = US( open )( path, US( O_RDONLY ) );
     if( m_descriptor < 0 )
     {
-        throw Exception( "Cannot open AppendOnlyFile", errno );
+        throw otk::Exception( "Cannot open AppendOnlyFile", errno );
     }
 }
 
@@ -68,9 +68,9 @@ void ObjectFileReader::read( off_t offset, size_t size, void* dest )
     // We assume system calls are automatically restarted when interrupted (sigacation SA_RESTART).
     ssize_t bytesRead = pread( m_descriptor, dest, size, offset );
     if( bytesRead < 0 )
-        throw Exception( "pread() call failed in ObjectFileReader", errno );
+        throw otk::Exception( "pread() call failed in ObjectFileReader", errno );
     else if( bytesRead != size )
-        throw Exception( "Incomplete pread() call in ObjectFileReader" );
+        throw otk::Exception( "Incomplete pread() call in ObjectFileReader" );
 }
 
-} // namespace otk
+} // namespace sceneDB

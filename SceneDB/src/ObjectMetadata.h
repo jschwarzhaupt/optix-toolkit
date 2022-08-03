@@ -32,7 +32,7 @@
 #include <cstddef>
 #include <sys/types.h>
 
-namespace otk {
+namespace sceneDB {
 
 struct ObjectMetadata
 {
@@ -41,4 +41,4 @@ struct ObjectMetadata
     size_t   size;
 };
     
-} // namespace otk
+} // namespace sceneDB

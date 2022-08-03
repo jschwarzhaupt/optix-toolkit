@@ -45,7 +45,7 @@
 #define US( x ) x
 #endif
 
-namespace otk {
+namespace sceneDB {
 
 AppendOnlyFile::AppendOnlyFile( const char* path )
 {
@@ -60,7 +60,7 @@ AppendOnlyFile::AppendOnlyFile( const char* path )
     m_descriptor = US( open )( path, US( O_WRONLY ) | US( O_CREAT ) | US( O_TRUNC ), mode );
     if( m_descriptor < 0 )
     {
-        throw Exception( "Cannot open AppendOnlyFile", errno );
+        throw otk::Exception( "Cannot open AppendOnlyFile", errno );
     }
 }
 
@@ -81,7 +81,7 @@ off_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
     // Write the object at the reserved offset, using pwritev() to concatenate the given data blocks.
     ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( dataBlocks ), numDataBlocks, begin );
     if( bytesWritten != size )
-        throw Exception( "Error writing data to AppendOnlyFile" );
+        throw otk::Exception( "Error writing data to AppendOnlyFile" );
 
     // Return the offset of the object data.
     return begin;
@@ -96,8 +96,8 @@ void AppendOnlyFile::flush()
 #endif
     if( status )
     {
-        throw Exception( "Failed to flush AppendOnlyFile", errno );
+        throw otk::Exception( "Failed to flush AppendOnlyFile", errno );
     }
 }
 
-}  // namespace otk
+}  // namespace sceneDB

@@ -32,7 +32,7 @@
 
 #include <cstdint>
 
-namespace otk {
+namespace sceneDB {
 
 /** ObjectStoreWriter is used to insert key/value pairs into an ObjectStore.  It supports concurrent
     insertions with no locking, with the proviso that an ObjectStore has only one writer, and only one
@@ -86,4 +86,4 @@ class ObjectStoreWriter
     virtual void flush() = 0;
 };
 
-}  // namespace otk
+}  // namespace sceneDB
