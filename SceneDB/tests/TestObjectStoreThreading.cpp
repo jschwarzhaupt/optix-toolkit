@@ -37,7 +37,7 @@
 #include <thread>
 #include <time.h>
 
-#define PERF_TESTING
+// #define PERF_TESTING
 #ifdef PERF_TESTING
 #define PRINTF_INFO
 #define PRINTF_STATS printf
@@ -248,10 +248,11 @@ class ObjectReaders
 struct TestParams
 {
     unsigned int numThreads;
-    size_t numObjects;
-    size_t fixedObjectSize;
-    size_t minObjectSize;
-    size_t maxObjectSize;
+    size_t       numObjects;
+    size_t       fixedObjectSize;
+    size_t       minObjectSize;
+    size_t       maxObjectSize;
+    bool         validateData;
 };
 
 class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
@@ -310,7 +311,7 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     writers.write();
 
     // Read the objects, validating their contents.
-    ObjectReaders readers( *m_store, sizes, /*validateData=*/ true, params.numThreads );
+    ObjectReaders readers( *m_store, sizes, /*validateData=*/ params.validateData, params.numThreads );
     readers.read();
 }
 
@@ -318,9 +319,9 @@ unsigned int g_maxThreads = std::thread::hardware_concurrency();
 
 #ifndef PERF_TESTING
 std::vector<TestParams> g_params{
-    // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize
-    {1, 128, 8 * 1024, 0, 0},
-    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024},
+    // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize, validataData
+    {1, 128, 8 * 1024, 0, 0, true},
+    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024, true},
 };
 #else
 std::vector<TestParams> g_params;
@@ -331,17 +332,24 @@ int initParams()
     unsigned int numThreads = 1;
     for( size_t size = 64; size <= 1024; size += 64 )
     {
-        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0} );
+        // Params: numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize, validataData
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0, false } );
     }
     for( size_t size = 512; size <= 16 * 1024; size += 512 )
     {
-        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0} );
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0, false} );
+    }
+#elif 0
+    // Test 4K object throughput vs. thread count.
+    for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * g_maxThreads ); ++numThreads )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, 4 * 1024, 0, 0, false} );
     }
 #else
-    // Test 4K object throughput vs. thread count.
-    for( unsigned int numThreads = 1; numThreads <= g_maxThreads; ++numThreads )
+    // Test 12K object throughput vs. thread count.
+    for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * g_maxThreads ); ++numThreads )
     {
-        g_params.push_back( TestParams{numThreads, 10000, 4 * 1024, 0, 0} );
+        g_params.push_back( TestParams{numThreads, 10000, 12 * 1024, 0, 0, false} );
     }
 #endif
     return 0;
