@@ -46,6 +46,20 @@ namespace otk {
 class ObjectStoreWriter
 {
   public:
+    /// Options for configuring ObjectStoreWriter, which is obtained via ObjectStore::getWriter().
+    struct Options
+    {
+        /// \param bufferSize { If greater than zero, writes are buffered.  Partial
+        /// object records are never written.  The buffer is flushed when writing an object record that
+        /// would overflow the buffer. }
+        size_t bufferSize = 0;
+
+        /// \param discardDuplicates { When true, inserting an object has
+        /// no effect when its key is already stored.  This is useful when keys are content-based
+        /// addresses (CBAs). }
+        bool discardDuplicates = false;
+    };
+    
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
@@ -78,22 +92,16 @@ class ObjectStoreWriter
     void flush() const;
 
   protected:
-    friend class ObjectStore;
+    friend class ObjectStoreImpl;
 
-    /// Use ObjectStore::create() to obtain an ObjectStoreWriter.
-    /// \param objectStore { The parent ObjectStore. }
-    /// \param bufferSize { If greater than zero, writes are buffered.  Partial object records are
-    /// never written.  The buffer is flushed when writing an object record that would overflow the
-    /// buffer.  (An object record includes the key and the object size.) }
-    /// \param discardDuplicates { When true, the ObjectStoreWriter discards insertions for keys
-    /// that are already stored, which is useful when keys are content-based addresses (CBAs). }
-    explicit ObjectStoreWriter( const class ObjectStore& objectStore, size_t bufferSize = 0, bool discardDuplicates = false );
+    /// Use ObjectStore::getWriter() to obtain an ObjectStoreWriter.
+    ObjectStoreWriter( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:
+    Options                               m_options;
     std::unique_ptr<class AppendOnlyFile> m_objects;
     std::unique_ptr<class AppendOnlyFile> m_objectInfo;
 
-    const bool m_discardDuplicates = false;
     std::unordered_set<Key> m_keys;
     std::mutex m_keysMutex;
 };

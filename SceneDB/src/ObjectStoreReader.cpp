@@ -26,11 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+
 #include "ObjectFileReader.h"
 #include "ObjectInfoMap.h"
+#include "ObjectStoreImpl.h"
 
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
-#include <OptiXToolkit/SceneDB/ObjectStore.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
@@ -39,9 +40,10 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreReader::ObjectStoreReader( const ObjectStore& objectStore, bool pollForUpdates )
+ObjectStoreReader::ObjectStoreReader( const ObjectStoreImpl& objectStore, const Options& options )
+    : m_options( options )
 {
-    OTK_ASSERT_MSG( !pollForUpdates, "ObjectStoreReader polling is TBD." );
+    OTK_ASSERT_MSG( !m_options.pollForUpdates, "ObjectStoreReader polling is TBD." );
 
     // Open the object data file and read the object info file.
     m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );

@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/ObjectStore.h>
+#include "ObjectStoreImpl.h"
 
 #include <filesystem>
 
@@ -34,38 +34,47 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStore::ObjectStore( const char* directory )
-    : m_directory( directory )
-    , m_dataFile( m_directory / "objects.dat" )
-    , m_indexFile( m_directory / "index.dat" )
+std::shared_ptr<ObjectStore> ObjectStore::getInstance( const Options& options )
 {
+    return std::shared_ptr<ObjectStore>( new ObjectStoreImpl( options ) );
 }
 
 ObjectStore::~ObjectStore()
 {
 }
 
-bool ObjectStore::exists() const
+ObjectStoreImpl::ObjectStoreImpl( const Options& options )
+    : m_options( options )
+    , m_dataFile( path( m_options.directory ) / "objects.dat" )
+    , m_indexFile( path( m_options.directory ) / "index.dat" )
+{
+}
+
+ObjectStoreImpl::~ObjectStoreImpl()
+{
+}
+
+bool ObjectStoreImpl::exists() const
 {
     return std::filesystem::exists( m_dataFile ) && std::filesystem::exists( m_indexFile );
 }
-
-std::shared_ptr<ObjectStoreWriter> ObjectStore::create( size_t bufferSize, bool discardDuplicates ) const
+    
+std::shared_ptr<ObjectStoreWriter> ObjectStoreImpl::getWriter( const ObjectStoreWriter::Options& options )
 {
     // Create the specified directory if necessary. (Throws if an error occurs.)
-    std::filesystem::create_directory( m_directory );
+    std::filesystem::create_directory( path( m_options.directory ) );
 
-    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriter( *this, bufferSize, discardDuplicates ) );
+    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriter( *this, options ) );
 }
 
-std::shared_ptr<ObjectStoreReader> ObjectStore::read( bool pollForUpdates ) const
+std::shared_ptr<ObjectStoreReader> ObjectStoreImpl::getReader( const ObjectStoreReader::Options& options )
 {
-    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReader( *this, pollForUpdates ) );
+    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReader( *this, options ) );
 }
 
-void ObjectStore::destroy()
+void ObjectStoreImpl::destroy()
 {
-    std::filesystem::remove_all( m_directory );
+    std::filesystem::remove_all( path( m_options.directory ) );
 }
 
 }  // namespace otk

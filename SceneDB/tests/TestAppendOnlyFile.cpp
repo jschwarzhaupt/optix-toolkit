@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
+#include "AppendOnlyFile.h"
 
 #include <filesystem>
 

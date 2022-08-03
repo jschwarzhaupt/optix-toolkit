@@ -42,6 +42,12 @@ namespace otk {
 class ObjectStoreReader
 {
   public:
+    struct Options
+    {
+        /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
+        bool pollForUpdates = false;
+    };
+    
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
@@ -58,14 +64,15 @@ class ObjectStoreReader
     bool find( Key key, std::vector<char>& dest );
 
   protected:
-    friend class ObjectStore;
+    friend class ObjectStoreImpl;
 
     /// Use ObjectStore::read() to obtain an ObjectStoreReader.
     /// \param objectStore { The parent ObjectStore. }
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
-    ObjectStoreReader( const class ObjectStore& objectStore, bool pollForUpdates = false );
+    ObjectStoreReader( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:
+    Options                                 m_options;
     std::unique_ptr<class ObjectFileReader> m_objects;
     std::unique_ptr<class ObjectInfoMap>    m_objectInfo;
 };

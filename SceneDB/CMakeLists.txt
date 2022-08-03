@@ -40,9 +40,11 @@ include(../CMake/BuildConfig.cmake)
 
 add_library(SceneDB SHARED
   src/AppendOnlyFile.cpp
+  src/AppendOnlyFile.h
   src/ObjectFileReader.cpp
   src/ObjectInfoMap.cpp
-  src/ObjectStore.cpp
+  src/ObjectStoreImpl.cpp
+  src/ObjectStoreImpl.h
   src/ObjectStoreReader.cpp
   src/ObjectStoreWriter.cpp
   )
@@ -56,7 +58,6 @@ target_sources(SceneDB
   FILE_SET HEADERS 
   BASE_DIRS include
   FILES
-  include/OptiXToolkit/SceneDB/AppendOnlyFile.h
   include/OptiXToolkit/SceneDB/DataBlock.h
   include/OptiXToolkit/SceneDB/ObjectStore.h
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h

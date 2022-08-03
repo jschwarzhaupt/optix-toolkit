@@ -27,11 +27,11 @@
 //
 
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-#include <OptiXToolkit/SceneDB/ObjectStore.h>
 
+#include "AppendOnlyFile.h"
 #include "ObjectInfo.h"
+#include "ObjectStoreImpl.h"
 
-#include <OptiXToolkit/SceneDB/AppendOnlyFile.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
@@ -40,10 +40,10 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( const ObjectStore& objectStore, size_t bufferSize, bool discardDuplicates )
-    : m_discardDuplicates( discardDuplicates )
+ObjectStoreWriter::ObjectStoreWriter( const ObjectStoreImpl& objectStore, const Options& options )
+    : m_options( options )
 {
-    OTK_ASSERT_MSG( bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
+    OTK_ASSERT_MSG( m_options.bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
 
     // Create object data and info files.
     m_objects.reset( new AppendOnlyFile( objectStore.getDataFile().string().c_str() ) );
@@ -57,7 +57,7 @@ ObjectStoreWriter::~ObjectStoreWriter()
 bool ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Optionally discard objects with duplicate keys (i.e. when key is a content-based addresses).
-    if( m_discardDuplicates )
+    if( m_options.discardDuplicates )
     {
         std::unique_lock lock( m_keysMutex );
         if( m_keys.find( key ) != m_keys.end() )

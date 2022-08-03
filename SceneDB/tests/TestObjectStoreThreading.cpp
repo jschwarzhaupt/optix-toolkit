@@ -70,9 +70,9 @@ class Stopwatch
 class ObjectWriters
 {
   public:
-    ObjectWriters( const ObjectStore&         store,
-                   const std::vector<size_t>& objectSizes,
-                   unsigned int               numThreads = std::thread::hardware_concurrency() )
+    ObjectWriters( std::shared_ptr<ObjectStore> store,
+                   const std::vector<size_t>&   objectSizes,
+                   unsigned int                 numThreads = std::thread::hardware_concurrency() )
         : m_store( store )
         , m_objectSizes( objectSizes )
     {
@@ -94,7 +94,7 @@ class ObjectWriters
         Stopwatch time;
 
         // Create the ObjectStoreWriter.
-        m_writer = m_store.create();
+        m_writer = m_store->getWriter();
         
         // Start threads.
         ASSERT_TRUE( m_threads.empty() );
@@ -119,7 +119,7 @@ class ObjectWriters
     }
 
   private:
-    const ObjectStore&                 m_store;
+    std::shared_ptr<ObjectStore>       m_store;
     std::shared_ptr<ObjectStoreWriter> m_writer;
     const std::vector<size_t>&         m_objectSizes;
     std::vector<std::thread>           m_threads;
@@ -150,10 +150,10 @@ class ObjectWriters
 class ObjectReaders
 {
   public:
-    ObjectReaders( const ObjectStore&         store,
-                   const std::vector<size_t>& objectSizes,
-                   bool                       validateData,
-                   unsigned int               numThreads = std::thread::hardware_concurrency() )
+    ObjectReaders( std::shared_ptr<ObjectStore> store,
+                   const std::vector<size_t>&   objectSizes,
+                   bool                         validateData,
+                   unsigned int                 numThreads = std::thread::hardware_concurrency() )
         : m_store( store )
         , m_objectSizes( objectSizes )
         , m_validateData( validateData )
@@ -173,7 +173,7 @@ class ObjectReaders
     {
         // Create the ObjectStoreReader.
         Stopwatch indexTimer;
-        m_reader = m_store.read();
+        m_reader = m_store->getReader();
 
         // Print object index read stats.
         double indexTime = indexTimer.elapsed();
@@ -206,7 +206,7 @@ class ObjectReaders
     }
 
   private:
-    const ObjectStore&                 m_store;
+    std::shared_ptr<ObjectStore>       m_store;
     const std::vector<size_t>&         m_objectSizes;
     bool                               m_validateData;
     std::shared_ptr<ObjectStoreReader> m_reader;
@@ -258,11 +258,11 @@ struct TestParams
 class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
 {
   public:
-    std::unique_ptr<ObjectStore> m_store;
+    std::shared_ptr<ObjectStore> m_store;
 
     void SetUp()
     {
-        m_store.reset( new ObjectStore( "_testObjectStoreThreading" ) );
+        m_store = ObjectStore::getInstance( ObjectStore::Options{ "_testObjectStoreThreading" } );
     }
 
     void TearDown()
@@ -307,11 +307,11 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     }
 
     // Write the objects.  The writer is scoped to ensure that it's closed properly.
-    ObjectWriters writers( *m_store, sizes, params.numThreads );
+    ObjectWriters writers( m_store, sizes, params.numThreads );
     writers.write();
 
     // Read the objects, validating their contents.
-    ObjectReaders readers( *m_store, sizes, /*validateData=*/ params.validateData, params.numThreads );
+    ObjectReaders readers( m_store, sizes, /*validateData=*/ params.validateData, params.numThreads );
     readers.read();
 }
 

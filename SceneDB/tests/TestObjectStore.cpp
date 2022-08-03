@@ -34,39 +34,40 @@ using namespace otk;
 
 class TestObjectStore : public testing::Test
 {
+public:
+    std::shared_ptr<ObjectStore> m_store;
+
+    void SetUp() { m_store = ObjectStore::getInstance( ObjectStore::Options{"_store"} ); }
 };
 
 TEST_F(TestObjectStore, TestCreateDestroy)
 {
-    ObjectStore store("_store");
-    auto writer = store.create();
-    EXPECT_TRUE( store.exists() );
+    auto writer = m_store->getWriter();
+    EXPECT_TRUE( m_store->exists() );
     writer.reset();
-    store.destroy();
+    m_store->destroy();
 }
 
 TEST_F(TestObjectStore, TestInsert)
 {
-    ObjectStore store("_store");
-    auto writer = store.create();
+    auto writer = m_store->getWriter();
     const char* str = "Hello, world!";
     writer->insert( 1, str, strlen( str ) );
 
     writer.reset();
-    store.destroy();
+    m_store->destroy();
 }
 
 TEST_F(TestObjectStore, TestWriteAndRead)
 {
-    ObjectStore store( "_store_testWriteAndRead" );
-    auto writer = store.create();
+    auto writer = m_store->getWriter();
     const char* str1 = "Hello, world!";
     const char* str2 = "Goodbye, cruel world.";
     writer->insert( 1, str1, strlen( str1 ) );
     writer->insert( 2, str2, strlen( str2 ) );
     writer.reset();
 
-    auto reader = store.read();
+    auto reader = m_store->getReader();
 
     std::vector<char> buf1(strlen(str1)+1);
     size_t size1;
@@ -79,5 +80,5 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
 
     reader.reset();
-    store.destroy();
+    m_store->destroy();
 }

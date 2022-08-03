@@ -28,39 +28,31 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
+
+#include <cstdint>
+#include <filesystem>
+#include <memory>
 
 namespace otk {
 
-/** ObjectStore stores arbitrarily sized objects, each with an associated key.  It supports
-    concurrent updates with no locking, with the proviso that only one process writes a particular
-    object store.  Multiple processes can read the object store.  Once created, an object store 
-    persists until it is destroyed or recreated. */
-class ObjectStore
+/** ObjectStoreImpl implements the abstract ObjectStore base class. */
+class ObjectStoreImpl : public ObjectStore
 {
   public:
-    /// Options for configuring object store.
-    struct Options
-    {
-        /// Path to directory containing object store files, if applicable.
-        std::string directory;
-    };
-    
-    /// Get an ObjectStore instance with the specified options.  An object store can only be written
-    /// by one instance, which can be shared by multiple threads.
-    static std::shared_ptr<ObjectStore> getInstance( const Options& options = Options() );
+    /// Construct an ObjectStoreImpl.  No I/O is performed until create() or read() is called.
+    ObjectStoreImpl( const Options& options );
 
-    /// Close an ObjectStore.  The contents of the object store persist until it is destroyed (via
-    /// the destroy method).
-    virtual ~ObjectStore() = 0;
+    /// Close an ObjectStoreImpl.  The contents of the object store persist until it is destroyed
+    /// (via the destroy method).
+    ~ObjectStoreImpl() override;
 
     /// Get an ObjectStoreWriter that can be used to insert objects in the store.  The object store
     /// is initialized when a writer is first created, destroying any previous contents.  Subsequent
     /// calls return the same writer (provided the options match, otherwise an exception is thrown).
     /// The writer can be used concurrently by multiple threads. Throws an exception if an error
     /// occurs.
-    virtual std::shared_ptr<ObjectStoreWriter> getWriter( const ObjectStoreWriter::Options& options = ObjectStoreWriter::Options() ) = 0;
+    std::shared_ptr<ObjectStoreWriter> getWriter( const ObjectStoreWriter::Options& options = ObjectStoreWriter::Options() ) override;
 
     /// Get an an ObjectStoreReader that can be used to read objects from the store.  The object
     /// store is opened for reading when the first reader with a given set of options is requested.
@@ -68,14 +60,26 @@ class ObjectStore
     /// threads.  getReader() should not be called before getWriter(), since creating a writer might
     /// reinitialize the object store, which invalidates any readers.  Throws an exception if an
     /// error occurs.
-    virtual std::shared_ptr<ObjectStoreReader> getReader( const ObjectStoreReader::Options& options = ObjectStoreReader::Options() ) = 0;
+    std::shared_ptr<ObjectStoreReader> getReader( const ObjectStoreReader::Options& options = ObjectStoreReader::Options() ) override;
 
     /// Check whether the object store has been initialized via getWriter().
-    virtual bool exists() const = 0;
+    bool exists() const override;
 
     /// Destroy the object store, removing any associated disk files.  Any previously created
     /// writers or readers should be destroyed before calling destroy().
-    virtual void destroy() = 0;
+    void destroy() override;
+
+  protected:
+    friend ObjectStoreReader;
+    friend ObjectStoreWriter;
+
+    const std::filesystem::path& getDataFile() const { return m_dataFile; }
+    const std::filesystem::path& getIndexFile() const { return m_indexFile; }
+
+  private:
+    Options               m_options;
+    std::filesystem::path m_dataFile;
+    std::filesystem::path m_indexFile;
 };
 
 }  // namespace otk
