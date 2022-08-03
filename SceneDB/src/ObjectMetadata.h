@@ -28,39 +28,17 @@
 
 #pragma once
 
-#include "ObjectInfo.h"
-
 #include <cstdint>
-#include <unordered_map>
+#include <cstddef>
+#include <sys/types.h>
 
 namespace otk {
 
-/** ObjectInfoMap is a map from Key to ObjectInfo, providing the file offset and size of each object
-    in an object store. */
-class ObjectInfoMap
+struct ObjectMetadata
 {
-  public:
-    using Key = uint64_t;
-
-    /// Construct ObjectInfoMap, reading records from the specified file.  Throws an exception if an
-    /// error occurs.  
-    /// \param filename { File containing ObjectInfo records. }
-    /// \param pollForUpdates { If true, a thread is spawned that polls the
-    /// filesystem for updates. }
-    ObjectInfoMap( const char* filename, bool pollForUpdates = false );
-
-    /// Find ObjectInfo for the specified key.  Returns nullptr if not found.
-    const ObjectInfo* find( Key key ) const
-    {
-        auto it = m_map.find( key );
-        return it == m_map.end() ? nullptr : &it->second;
-        // TODO: is it safe to return reference to an entry in an unordered_map?
-    }
-
-private:
-    std::unordered_map<Key, ObjectInfo> m_map;
-
-    void readInfo( const char* filename );
+    uint64_t key;
+    off_t    offset;
+    size_t   size;
 };
-
-}  // namespace otk
+    
+} // namespace otk

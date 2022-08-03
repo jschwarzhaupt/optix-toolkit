@@ -26,42 +26,42 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectInfoMap.h"
+#include "ObjectMetadataMap.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
 namespace otk {
 
-ObjectInfoMap::ObjectInfoMap( const char* filename, bool pollForUpdates )
+ObjectMetadataMap::ObjectMetadataMap( const char* filename, bool pollForUpdates )
 {
-    OTK_ASSERT_MSG( !pollForUpdates, "ObjectInfoMap polling is TBD" );
-    readInfo( filename );
+    OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
+    readMetadata( filename );
 }
 
-void ObjectInfoMap::readInfo( const char* filename )
+void ObjectMetadataMap::readMetadata( const char* filename )
 {
-    // Open the object info file.
+    // Open the object metadata file.
     FILE* file = fopen( filename, "rb" );
     if( file == nullptr )
-        throw Exception( ( std::string( "Error opening object info file: " ) + filename ).c_str() );
+        throw Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
 
     // Read records (using buffered I/O), updating the map.  For now we stop
     // when EOF is encountered, rather than continuing to poll for updates.
-    ObjectInfo info;
+    ObjectMetadata metadata;
     while (true)
     {
-        // Read one ObjectInfo 
-        size_t itemsRead = fread( &info, sizeof( ObjectInfo ), 1, file );
+        // Read one ObjectMetadata 
+        size_t itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, file );
         if (itemsRead < 1)
         {
             if (ferror(file))
-                throw Exception( ( std::string( "Error reading object info file: " ) + filename ).c_str() );
+                throw Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
             else
                 return; // EOF
 
         }
-        // Map key to ObjectInfo.
-        m_map[info.key] = info;
+        // Map key to ObjectMetadata.
+        m_map[metadata.key] = metadata;
     }
 }
 

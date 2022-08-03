@@ -28,17 +28,39 @@
 
 #pragma once
 
+#include "ObjectMetadata.h"
+
 #include <cstdint>
-#include <cstddef>
-#include <sys/types.h>
+#include <unordered_map>
 
 namespace otk {
 
-struct ObjectInfo
+/** ObjectMetadata is a map from Key to ObjectMetadata, providing the file offset and size of each object
+    in an object store. */
+class ObjectMetadataMap
 {
-    uint64_t key;
-    off_t    offset;
-    size_t   size;
+  public:
+    using Key = uint64_t;
+
+    /// Construct ObjectMetadata, reading records from the specified file.  Throws an exception if an
+    /// error occurs.  
+    /// \param filename { File containing ObjectMetadata records. }
+    /// \param pollForUpdates { If true, a thread is spawned that polls the
+    /// filesystem for updates. }
+    ObjectMetadataMap( const char* filename, bool pollForUpdates = false );
+
+    /// Find ObjectMetadata for the specified key.  Returns nullptr if not found.
+    const ObjectMetadata* find( Key key ) const
+    {
+        auto it = m_map.find( key );
+        return it == m_map.end() ? nullptr : &it->second;
+        // TODO: is it safe to return reference to an entry in an unordered_map?
+    }
+
+private:
+    std::unordered_map<Key, ObjectMetadata> m_map;
+
+    void readMetadata( const char* filename );
 };
-    
-} // namespace otk
+
+}  // namespace otk

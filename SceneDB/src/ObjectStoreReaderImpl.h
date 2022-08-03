@@ -64,9 +64,9 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
     ObjectStoreReaderImpl( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:
-    Options                                 m_options;
-    std::unique_ptr<class ObjectFileReader> m_objects;
-    std::unique_ptr<class ObjectInfoMap>    m_objectInfo;
+    Options                                  m_options;
+    std::unique_ptr<class ObjectFileReader>  m_objects;
+    std::unique_ptr<class ObjectMetadataMap> m_metadata;
 };
 
 }  // namespace otk

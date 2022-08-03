@@ -28,7 +28,7 @@
 
 #include "ObjectStoreWriterImpl.h"
 #include "AppendOnlyFile.h"
-#include "ObjectInfo.h"
+#include "ObjectMetadata.h"
 #include "ObjectStoreImpl.h"
 
 #include <OptiXToolkit/Util/Exception.h>
@@ -48,9 +48,9 @@ ObjectStoreWriterImpl::ObjectStoreWriterImpl( const ObjectStoreImpl& objectStore
 {
     OTK_ASSERT_MSG( m_options.bufferSize == 0, "ObjectStoreWriterImpl buffering is TBD" );
 
-    // Create object data and info files.
+    // Create object data and metadata files.
     m_objects.reset( new AppendOnlyFile( objectStore.getDataFile().string().c_str() ) );
-    m_objectInfo.reset( new AppendOnlyFile( objectStore.getIndexFile().string().c_str() ) );
+    m_metadata.reset( new AppendOnlyFile( objectStore.getIndexFile().string().c_str() ) );
 }
 
 ObjectStoreWriterImpl::~ObjectStoreWriterImpl()
@@ -72,9 +72,9 @@ bool ObjectStoreWriterImpl::insertV( Key key, const DataBlock* dataBlocks, int n
     off_t offset = m_objects->appendV( dataBlocks, numDataBlocks );
     size_t size = sumDataBlockSizes( dataBlocks, numDataBlocks );
 
-    // Append a record to the object info file specifying the key, offset, and size of the object.
-    ObjectInfo info{ key, offset, size };
-    m_objectInfo->append( &info, sizeof( ObjectInfo ) );
+    // Append a record to the object metadata file specifying the key, offset, and size of the object.
+    ObjectMetadata metadata{ key, offset, size };
+    m_metadata->append( &metadata, sizeof( ObjectMetadata ) );
     return true;
 }
 
@@ -87,7 +87,7 @@ void ObjectStoreWriterImpl::remove( Key key )
 void ObjectStoreWriterImpl::flush()
 {
     m_objects->flush();
-    m_objectInfo->flush();
+    m_metadata->flush();
 }
 
 }  // namespace otk

@@ -28,7 +28,7 @@
 
 #include "ObjectStoreReaderImpl.h"
 #include "ObjectFileReader.h"
-#include "ObjectInfoMap.h"
+#include "ObjectMetadataMap.h"
 #include "ObjectStoreImpl.h"
 
 #include <OptiXToolkit/Util/Exception.h>
@@ -48,9 +48,9 @@ ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore
 {
     OTK_ASSERT_MSG( !m_options.pollForUpdates, "ObjectStoreReaderImpl polling is TBD." );
 
-    // Open the object data file and read the object info file.
+    // Open the object data file and read the object metadata file.
     m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );
-    m_objectInfo.reset( new ObjectInfoMap( objectStore.getIndexFile().string().c_str() ) );
+    m_metadata.reset( new ObjectMetadataMap( objectStore.getIndexFile().string().c_str() ) );
 }
 
 ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
@@ -59,31 +59,31 @@ ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
 
 bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
 {
-    // Look up the key in the object info map.
-    const ObjectInfo* info = m_objectInfo->find( key );
-    if( !info )
+    // Look up the key in the object metadata map.
+    const ObjectMetadata* metadata = m_metadata->find( key );
+    if( !metadata )
         return false;
 
-    // Read the object using the offset and size from the object info.
-    OTK_ASSERT( destSize >= info->size );
-    resultSize = info->size;
-    m_objects->read( info->offset, info->size, dest );
+    // Read the object using the offset and size from the object metadata.
+    OTK_ASSERT( destSize >= metadata->size );
+    resultSize = metadata->size;
+    m_objects->read( metadata->offset, metadata->size, dest );
     return true;
 }
 
 bool ObjectStoreReaderImpl::find( Key key, std::vector<char>& dest )
 {
-    // Look up the key in the object info map.
-    const ObjectInfo* info = m_objectInfo->find( key );
-    if( !info )
+    // Look up the key in the object metadata map.
+    const ObjectMetadata* metadata = m_metadata->find( key );
+    if( !metadata )
         false;
 
     // Allocate storage for the object.
     dest.clear();
-    dest.resize( info->size );
+    dest.resize( metadata->size );
 
-    // Read the object using the offset and size from the object info.
-    m_objects->read( info->offset, info->size, dest.data() );
+    // Read the object using the offset and size from the object metadata.
+    m_objects->read( metadata->offset, metadata->size, dest.data() );
     return true;
 }
 

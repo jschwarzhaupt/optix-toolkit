@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectInfo.h"
+#include "ObjectMetadata.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
 
@@ -177,7 +177,7 @@ class ObjectReaders
 
         // Print object index read stats.
         double indexTime = indexTimer.elapsed();
-        float indexSizeMB = m_objectSizes.size() * sizeof( ObjectInfo ) / (1024 * 1024.f);
+        float indexSizeMB = m_objectSizes.size() * sizeof( ObjectMetadata ) / (1024 * 1024.f);
         PRINTF_INFO( "Object index: read %g MB (%zu entries) in %g msec (%g MB/s)\n", indexSizeMB, m_objectSizes.size(),
                      indexTime * 1000.0, indexSizeMB / indexTime );
         

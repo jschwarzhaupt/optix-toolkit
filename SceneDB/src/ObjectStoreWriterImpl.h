@@ -85,7 +85,7 @@ class ObjectStoreWriterImpl : public ObjectStoreWriter
   private:
     Options                               m_options;
     std::unique_ptr<class AppendOnlyFile> m_objects;
-    std::unique_ptr<class AppendOnlyFile> m_objectInfo;
+    std::unique_ptr<class AppendOnlyFile> m_metadata;
 
     std::unordered_set<Key> m_keys;
     std::mutex m_keysMutex;
