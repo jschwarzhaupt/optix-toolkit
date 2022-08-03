@@ -26,8 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
-
+#include "ObjectStoreWriterImpl.h"
 #include "AppendOnlyFile.h"
 #include "ObjectInfo.h"
 #include "ObjectStoreImpl.h"
@@ -40,21 +39,25 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreWriter::ObjectStoreWriter( const ObjectStoreImpl& objectStore, const Options& options )
+ObjectStoreWriter::~ObjectStoreWriter()
+{
+}
+
+ObjectStoreWriterImpl::ObjectStoreWriterImpl( const ObjectStoreImpl& objectStore, const Options& options )
     : m_options( options )
 {
-    OTK_ASSERT_MSG( m_options.bufferSize == 0, "ObjectStoreWriter buffering is TBD" );
+    OTK_ASSERT_MSG( m_options.bufferSize == 0, "ObjectStoreWriterImpl buffering is TBD" );
 
     // Create object data and info files.
     m_objects.reset( new AppendOnlyFile( objectStore.getDataFile().string().c_str() ) );
     m_objectInfo.reset( new AppendOnlyFile( objectStore.getIndexFile().string().c_str() ) );
 }
 
-ObjectStoreWriter::~ObjectStoreWriter()
+ObjectStoreWriterImpl::~ObjectStoreWriterImpl()
 {
 }
 
-bool ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
+bool ObjectStoreWriterImpl::insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Optionally discard objects with duplicate keys (i.e. when key is a content-based addresses).
     if( m_options.discardDuplicates )
@@ -75,7 +78,13 @@ bool ObjectStoreWriter::insertV( Key key, const DataBlock* dataBlocks, int numDa
     return true;
 }
 
-void ObjectStoreWriter::flush() const
+void ObjectStoreWriterImpl::remove( Key key )
+{
+    // TODO
+    OTK_ASSERT_MSG( false, "ObjectStoreWriterImpl::remove is TBD" );
+}
+
+void ObjectStoreWriterImpl::flush()
 {
     m_objects->flush();
     m_objectInfo->flush();

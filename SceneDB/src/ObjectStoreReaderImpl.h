@@ -28,37 +28,42 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <vector>
+#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+
+#include <memory>
 
 namespace otk {
 
-/** ObjectStoreReader is a thread-safe reader for an ObjectStore. */
-class ObjectStoreReader
+/** ObjectStoreReader is a thread-safe reader for an ObjectStore.  The implementation reads a table
+    of contents to create an index mapping each key to an object's size and offset in the object
+    file.  Multiple records can then be read concurrently from the object file. */
+class ObjectStoreReaderImpl : public ObjectStoreReader
 {
   public:
-    /// Options for configuring ObjectStoreReader, which is obtained via ObjectStore::getReader().
-    struct Options
-    {
-        /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
-        bool pollForUpdates = false;
-    };
-    
-    /// The key is a 64-bit integer, which is typically a content-based address (CBA).
-    using Key = uint64_t;
-
-    /// Destroy ObjectStoreReader, releasing any associated resources.
-    virtual ~ObjectStoreReader();
+    /// Destroy ObjectStoreReader, closing any associated files.
+    virtual ~ObjectStoreReaderImpl();
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer and returning the object size via result parameter.  Throws an exception
     /// if the object size exceeds the buffer size.  Thread safe.
-    virtual bool find( Key key, void* dest, size_t destSize, size_t& resultSize ) = 0;
+    bool find( Key key, void* dest, size_t destSize, size_t& resultSize ) override;
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer (which is resized if necessary).  Thread safe.
-    virtual bool find( Key key, std::vector<char>& dest ) = 0;
+    bool find( Key key, std::vector<char>& dest ) override;
+
+  protected:
+    friend class ObjectStoreImpl;
+
+    /// Use ObjectStore::read() to obtain an ObjectStoreReader.
+    /// \param objectStore { The parent ObjectStore. }
+    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
+    ObjectStoreReaderImpl( const class ObjectStoreImpl& objectStore, const Options& options );
+
+  private:
+    Options                                 m_options;
+    std::unique_ptr<class ObjectFileReader> m_objects;
+    std::unique_ptr<class ObjectInfoMap>    m_objectInfo;
 };
 
 }  // namespace otk

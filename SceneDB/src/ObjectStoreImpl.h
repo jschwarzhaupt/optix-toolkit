@@ -45,7 +45,7 @@ class ObjectStoreImpl : public ObjectStore
 
     /// Close an ObjectStoreImpl.  The contents of the object store persist until it is destroyed
     /// (via the destroy method).
-    ~ObjectStoreImpl() override;
+    virtual ~ObjectStoreImpl();
 
     /// Get an ObjectStoreWriter that can be used to insert objects in the store.  The object store
     /// is initialized when a writer is first created, destroying any previous contents.  Subsequent
@@ -70,8 +70,8 @@ class ObjectStoreImpl : public ObjectStore
     void destroy() override;
 
   protected:
-    friend ObjectStoreReader;
-    friend ObjectStoreWriter;
+    friend class ObjectStoreReaderImpl;
+    friend class ObjectStoreWriterImpl;
 
     const std::filesystem::path& getDataFile() const { return m_dataFile; }
     const std::filesystem::path& getIndexFile() const { return m_indexFile; }

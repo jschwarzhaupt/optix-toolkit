@@ -26,8 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
-
+#include "ObjectStoreReaderImpl.h"
 #include "ObjectFileReader.h"
 #include "ObjectInfoMap.h"
 #include "ObjectStoreImpl.h"
@@ -40,21 +39,25 @@ using path = std::filesystem::path;
 
 namespace otk {
 
-ObjectStoreReader::ObjectStoreReader( const ObjectStoreImpl& objectStore, const Options& options )
+ObjectStoreReader::~ObjectStoreReader()
+{
+}
+
+ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore, const Options& options )
     : m_options( options )
 {
-    OTK_ASSERT_MSG( !m_options.pollForUpdates, "ObjectStoreReader polling is TBD." );
+    OTK_ASSERT_MSG( !m_options.pollForUpdates, "ObjectStoreReaderImpl polling is TBD." );
 
     // Open the object data file and read the object info file.
     m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );
     m_objectInfo.reset( new ObjectInfoMap( objectStore.getIndexFile().string().c_str() ) );
 }
 
-ObjectStoreReader::~ObjectStoreReader()
+ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
 {
 }
 
-bool ObjectStoreReader::find( Key key, void* dest, size_t destSize, size_t& resultSize )
+bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
 {
     // Look up the key in the object info map.
     const ObjectInfo* info = m_objectInfo->find( key );
@@ -68,7 +71,7 @@ bool ObjectStoreReader::find( Key key, void* dest, size_t destSize, size_t& resu
     return true;
 }
 
-bool ObjectStoreReader::find( Key key, std::vector<char>& dest )
+bool ObjectStoreReaderImpl::find( Key key, std::vector<char>& dest )
 {
     // Look up the key in the object info map.
     const ObjectInfo* info = m_objectInfo->find( key );

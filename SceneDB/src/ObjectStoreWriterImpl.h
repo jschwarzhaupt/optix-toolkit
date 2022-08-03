@@ -28,56 +28,64 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/DataBlock.h>
+#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 
-#include <cstdint>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <unordered_set>
+#include <string>
+#include <vector>
 
 namespace otk {
 
 /** ObjectStoreWriter is used to insert key/value pairs into an ObjectStore.  It supports concurrent
     insertions with no locking, with the proviso that an ObjectStore has only one writer, and only one
     process may write to the files for a particular object store. */
-class ObjectStoreWriter
+class ObjectStoreWriterImpl : public ObjectStoreWriter
 {
   public:
-    /// Options for configuring ObjectStoreWriter, which is obtained via ObjectStore::getWriter().
-    struct Options
-    {
-        /// If greater than zero, writes are buffered.  Partial object records are never written.
-        /// The buffer is flushed when writing an object record that would overflow the buffer.
-        size_t bufferSize = 0;
-
-        /// When true, inserting an object has no effect when its key is already stored.  This is
-        /// useful when keys are content-based addresses (CBAs).
-        bool discardDuplicates = false;
-    };
-    
-    /// The key is a 64-bit integer, which is typically a content-based address (CBA).
-    using Key = uint64_t;
-
-    /// Destroy ObjectStoreWriter, releasing any associated resources.
-    virtual ~ObjectStoreWriter();
+    /// Destroy ObjectStoreWriter, closing any associated files.
+    ~ObjectStoreWriterImpl() override;
     
     /// Insert an object with the specified key, concatenating the object data from multiple data
     /// blocks, each of which specifies a data pointer and size.  Thread safe.  When the ObjectStore
     /// has deduplication enabled, the insert call has no effect (returning false) if an object with
     /// the same key was previously inserted (i.e. the key is a content-based address).  Throws an
     /// exception if an error occurs.
-    virtual bool insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks ) = 0;
+    bool insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks ) override;
 
     /// Insert an object with the specified key. Thread safe. When the ObjectStore has deduplication
     /// enabled, the insert call has no effect (returning false) if an object with the same key was
     /// previously inserted (i.e. the key is a content-based address).  Throws an exception if an
     /// error occurs.
-    virtual bool insert( Key key, const void* data, size_t size ) = 0;
+    bool insert( Key key, const void* data, size_t size ) override
+    {
+        DataBlock dataBlock{data, size};
+        return insertV( key, &dataBlock, 1 );
+    }
 
     /// Remove any object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
-    virtual void remove( Key key ) = 0;
+    void remove( Key key ) override;
 
     /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
     /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
-    virtual void flush() = 0;
+    void flush() override;
+
+  protected:
+    friend class ObjectStoreImpl;
+
+    /// Use ObjectStore::getWriter() to obtain an ObjectStoreWriter.
+    ObjectStoreWriterImpl( const class ObjectStoreImpl& objectStore, const Options& options );
+
+  private:
+    Options                               m_options;
+    std::unique_ptr<class AppendOnlyFile> m_objects;
+    std::unique_ptr<class AppendOnlyFile> m_objectInfo;
+
+    std::unordered_set<Key> m_keys;
+    std::mutex m_keysMutex;
 };
 
 }  // namespace otk

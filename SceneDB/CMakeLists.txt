@@ -45,8 +45,10 @@ add_library(SceneDB SHARED
   src/ObjectInfoMap.cpp
   src/ObjectStoreImpl.cpp
   src/ObjectStoreImpl.h
-  src/ObjectStoreReader.cpp
-  src/ObjectStoreWriter.cpp
+  src/ObjectStoreReaderImpl.cpp
+  src/ObjectStoreReaderImpl.h
+  src/ObjectStoreWriterImpl.cpp
+  src/ObjectStoreWriterImpl.h
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)

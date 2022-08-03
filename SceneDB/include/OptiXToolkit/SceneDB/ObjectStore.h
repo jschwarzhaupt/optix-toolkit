@@ -31,6 +31,9 @@
 #include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
 #include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
 
+#include <memory>
+#include <string>
+
 namespace otk {
 
 /** ObjectStore stores arbitrarily sized objects, each with an associated key.  It supports
@@ -53,7 +56,7 @@ class ObjectStore
 
     /// Close an ObjectStore.  The contents of the object store persist until it is destroyed (via
     /// the destroy method).
-    virtual ~ObjectStore() = 0;
+    virtual ~ObjectStore();
 
     /// Get an ObjectStoreWriter that can be used to insert objects in the store.  The object store
     /// is initialized when a writer is first created, destroying any previous contents.  Subsequent

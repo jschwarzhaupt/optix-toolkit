@@ -27,6 +27,8 @@
 //
 
 #include "ObjectStoreImpl.h"
+#include "ObjectStoreReaderImpl.h"
+#include "ObjectStoreWriterImpl.h"
 
 #include <filesystem>
 
@@ -64,12 +66,12 @@ std::shared_ptr<ObjectStoreWriter> ObjectStoreImpl::getWriter( const ObjectStore
     // Create the specified directory if necessary. (Throws if an error occurs.)
     std::filesystem::create_directory( path( m_options.directory ) );
 
-    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriter( *this, options ) );
+    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriterImpl( *this, options ) );
 }
 
 std::shared_ptr<ObjectStoreReader> ObjectStoreImpl::getReader( const ObjectStoreReader::Options& options )
 {
-    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReader( *this, options ) );
+    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReaderImpl( *this, options ) );
 }
 
 void ObjectStoreImpl::destroy()
