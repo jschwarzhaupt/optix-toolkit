@@ -43,8 +43,11 @@ class ObjectStoreReader
     {
         /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
         bool pollForUpdates = false;
+
+        /// Equality operator for options.
+        bool operator==( const Options& other ) const { return pollForUpdates == other.pollForUpdates; }
     };
-    
+
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 

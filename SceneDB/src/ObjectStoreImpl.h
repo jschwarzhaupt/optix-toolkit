@@ -28,11 +28,15 @@
 
 #pragma once
 
+#include "ObjectStoreReaderImpl.h"
+#include "ObjectStoreWriterImpl.h"
+
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
 
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 
 namespace otk {
 
@@ -77,9 +81,13 @@ class ObjectStoreImpl : public ObjectStore
     const std::filesystem::path& getIndexFile() const { return m_indexFile; }
 
   private:
-    Options               m_options;
-    std::filesystem::path m_dataFile;
-    std::filesystem::path m_indexFile;
+    const Options               m_options;
+    const std::filesystem::path m_dataFile;
+    const std::filesystem::path m_indexFile;
+
+    std::mutex m_mutex;
+    std::shared_ptr<ObjectStoreWriterImpl> m_writer;
+    std::shared_ptr<ObjectStoreReaderImpl> m_reader;
 };
 
 }  // namespace otk

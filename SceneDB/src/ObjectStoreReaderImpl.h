@@ -52,6 +52,9 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
     /// into the given buffer (which is resized if necessary).  Thread safe.
     bool find( Key key, std::vector<char>& dest ) override;
 
+    /// Get the options for this reader.
+    const Options& getOptions() const { return m_options; }
+
   protected:
     friend class ObjectStoreImpl;
 

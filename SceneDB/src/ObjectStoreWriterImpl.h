@@ -73,6 +73,9 @@ class ObjectStoreWriterImpl : public ObjectStoreWriter
     /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
     void flush() override;
 
+    /// Get the options for this writer.
+    const Options& getOptions() const { return m_options; }
+
   protected:
     friend class ObjectStoreImpl;
 

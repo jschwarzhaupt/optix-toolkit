@@ -27,8 +27,8 @@
 //
 
 #include "ObjectStoreImpl.h"
-#include "ObjectStoreReaderImpl.h"
-#include "ObjectStoreWriterImpl.h"
+
+#include <OptiXToolkit/Util/Exception.h>
 
 #include <filesystem>
 
@@ -63,19 +63,52 @@ bool ObjectStoreImpl::exists() const
     
 std::shared_ptr<ObjectStoreWriter> ObjectStoreImpl::getWriter( const ObjectStoreWriter::Options& options )
 {
-    // Create the specified directory if necessary. (Throws if an error occurs.)
-    std::filesystem::create_directory( path( m_options.directory ) );
+    std::unique_lock<std::mutex> lock( m_mutex );
+    OTK_ASSERT_MSG( !m_reader, "ObjectStore::getReader should not be called before getWriter" );
+    
+    // Subsequent calls return the same writer, provided the options match.
+    if( m_writer )
+    {
+        OTK_ASSERT_MSG( m_writer->getOptions() == options, "Conflicting ObjectStoreWriter options" );
+    }
+    else
+    {
+        // Create the specified directory if necessary. (Throws if an error occurs.)
+        std::filesystem::create_directory( path( m_options.directory ) );
 
-    return std::shared_ptr<ObjectStoreWriter>( new ObjectStoreWriterImpl( *this, options ) );
+        // Create a new writer.
+        m_writer.reset( new ObjectStoreWriterImpl( *this, options ) );
+    }
+
+    return m_writer;
 }
 
 std::shared_ptr<ObjectStoreReader> ObjectStoreImpl::getReader( const ObjectStoreReader::Options& options )
 {
-    return std::shared_ptr<ObjectStoreReader>( new ObjectStoreReaderImpl( *this, options ) );
+    std::unique_lock<std::mutex> lock( m_mutex );
+
+    // For now, all reader instances have the same options.
+    if( m_reader )
+    {
+        OTK_ASSERT_MSG( m_reader->getOptions() == options, "Conflicting ObjectStoreReader options" );
+    }
+    else
+    {
+        // Create a new reader.
+        m_reader.reset( new ObjectStoreReaderImpl( *this, options ) );
+    }
+    return m_reader;
 }
 
 void ObjectStoreImpl::destroy()
 {
+    std::unique_lock<std::mutex> lock( m_mutex );
+    OTK_ASSERT_MSG( !m_writer || m_writer.use_count() == 1,
+                    "Previous writer should be destroyed before destroying ObjectStore" );
+    OTK_ASSERT_MSG( !m_reader || m_reader.use_count() == 1,
+                    "Previous reader should be destroyed before destroying ObjectStore" );
+    m_writer.reset();
+    m_reader.reset();
     std::filesystem::remove_all( path( m_options.directory ) );
 }
 

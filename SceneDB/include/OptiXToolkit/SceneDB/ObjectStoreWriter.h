@@ -50,8 +50,14 @@ class ObjectStoreWriter
         /// When true, inserting an object has no effect when its key is already stored.  This is
         /// useful when keys are content-based addresses (CBAs).
         bool discardDuplicates = false;
+
+        /// Equality operator for options.
+        bool operator==( const Options& other) const
+        {
+            return bufferSize == other.bufferSize && discardDuplicates == other.discardDuplicates;
+        }
     };
-    
+
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
 
