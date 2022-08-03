@@ -37,6 +37,15 @@
 #include <thread>
 #include <time.h>
 
+#define PERF_TESTING
+#ifdef PERF_TESTING
+#define PRINTF_INFO
+#define PRINTF_STATS printf
+#else
+#define PRINTF_INFO printf
+#define PRINTF_STATS
+#endif
+
 using namespace otk;
 
 class Stopwatch
@@ -105,7 +114,8 @@ class ObjectWriters
 
         double elapsed = time.elapsed();
         float totalSizeMB = std::accumulate(m_objectSizes.begin(), m_objectSizes.end(), 0UL) / (1024 * 1024.f);
-        printf( "Wrote %g MB in %g msec (%g MB/s)\n", totalSizeMB, elapsed * 1000.0, totalSizeMB / elapsed );
+        PRINTF_INFO( "Wrote %g MB in %g msec (%g MB/s)\n", totalSizeMB, elapsed * 1000.0, totalSizeMB / elapsed );
+        PRINTF_STATS( "%zu %g #write, size=%zu\n", m_threads.size(), totalSizeMB / elapsed, m_objectSizes[0] );
     }
 
   private:
@@ -168,9 +178,9 @@ class ObjectReaders
         // Print object index read stats.
         double indexTime = indexTimer.elapsed();
         float indexSizeMB = m_objectSizes.size() * sizeof( ObjectInfo ) / (1024 * 1024.f);
-        printf( "Object index: read %g MB (%zu entries) in %g msec (%g MB/s)\n", indexSizeMB, m_objectSizes.size(),
-                indexTime * 1000.0, indexSizeMB / indexTime );
-
+        PRINTF_INFO( "Object index: read %g MB (%zu entries) in %g msec (%g MB/s)\n", indexSizeMB, m_objectSizes.size(),
+                     indexTime * 1000.0, indexSizeMB / indexTime );
+        
         // Start threads.
         Stopwatch dataTimer;
         ASSERT_TRUE( m_threads.empty() );
@@ -191,7 +201,8 @@ class ObjectReaders
         // Print object data read stats.
         double dataTime = dataTimer.elapsed();
         float totalSizeMB = std::accumulate( m_objectSizes.begin(), m_objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
-        printf( "Object data: read %g MB in %g msec (%g MB/s)\n", totalSizeMB, dataTime * 1000.0, totalSizeMB / dataTime );
+        PRINTF_INFO( "Object data: read %g MB in %g msec (%g MB/s)\n", totalSizeMB, dataTime * 1000.0, totalSizeMB / dataTime );
+        PRINTF_STATS( "%zu %g #read, size=%zu\n", m_threads.size(), totalSizeMB / dataTime, m_objectSizes[0] );
     }
 
   private:
@@ -282,14 +293,15 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     std::vector<size_t> sizes;
     if( params.fixedObjectSize )
     {
-        printf( "numThreads = %i, numObjects=%zu, fixedObjectSize=%zu\n", params.numThreads, params.numObjects, params.fixedObjectSize );
+        PRINTF_INFO( "numThreads = %i, numObjects=%zu, fixedObjectSize=%zu\n", params.numThreads, params.numObjects,
+                     params.fixedObjectSize );
         sizes.resize( params.numObjects, params.fixedObjectSize );
     }
     else
     {
         // Create vector of random object sizes.
-        printf( "numThreads=%i, numObjects=%zu, minObjectSize=%zu, maxObjectSize=%zu\n", params.numThreads,
-                params.numObjects, params.minObjectSize, params.maxObjectSize );
+        PRINTF_INFO( "numThreads=%i, numObjects=%zu, minObjectSize=%zu, maxObjectSize=%zu\n", params.numThreads,
+                     params.numObjects, params.minObjectSize, params.maxObjectSize );
         fillRandom( sizes, params.numObjects, params.minObjectSize, params.maxObjectSize );
     }
 
@@ -304,10 +316,37 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
 
 unsigned int g_maxThreads = std::thread::hardware_concurrency();
 
-TestParams params[] = {
+#ifndef PERF_TESTING
+std::vector<TestParams> g_params{
     // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize
     {1, 128, 8 * 1024, 0, 0},
     {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024},
 };
+#else
+std::vector<TestParams> g_params;
+int initParams()
+{
+#if 0
+    // Test throughput vs. object size.
+    unsigned int numThreads = 1;
+    for( size_t size = 64; size <= 1024; size += 64 )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0} );
+    }
+    for( size_t size = 512; size <= 16 * 1024; size += 512 )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0} );
+    }
+#else
+    // Test 4K object throughput vs. thread count.
+    for( unsigned int numThreads = 1; numThreads <= g_maxThreads; ++numThreads )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, 4 * 1024, 0, 0} );
+    }
+#endif
+    return 0;
+}
+int g_staticInit = initParams();
+#endif
 
-INSTANTIATE_TEST_SUITE_P( ThreadingTests, TestObjectStoreThreading, testing::ValuesIn( params ) );
+INSTANTIATE_TEST_SUITE_P( ThreadingTests, TestObjectStoreThreading, testing::ValuesIn( g_params ) );
