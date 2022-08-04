@@ -66,19 +66,27 @@ install(FILES ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfig.cmake
 #########################################################
 # Subdirectories
 
-option( OTK_BUILD_EXAMPLES "Enable build of OptiXToolkit examples" ON )
+option( OTK_BUILD_DEMAND_LOADING "Enable build of DemandLoading library" OFF )
 option( OTK_BUILD_DOCS "Enable build of OptiXToolkit documentation" ON)
-option( OTK_BUILD_GUI "Enable build of Gui library" ON )
+option( OTK_BUILD_EXAMPLES "Enable build of OptiXToolkit examples" OFF )
+option( OTK_BUILD_GUI "Enable build of Gui library" OFF )
+option( OTK_BUILD_SCENE_DB "Enable build of SceneDB library" ON )
+
+add_subdirectory(Util)
 
 if( OTK_BUILD_GUI OR OTK_BUILD_EXAMPLES )
   add_subdirectory(Gui)
 endif()  
 
-add_subdirectory(Cuda)
-add_subdirectory(Util)
-add_subdirectory(ImageSource)
-add_subdirectory(DemandLoading)
-add_subdirectory(SceneDB)
+if( OTK_BUILD_DEMAND_LOADING OR OTK_BUILD_EXAMPLES)
+  add_subdirectory(Cuda)
+  add_subdirectory(ImageSource)
+  add_subdirectory(DemandLoading)
+endif()
+
+if( OTK_BUILD_SCENE_DB )
+  add_subdirectory(SceneDB)
+endif()
 
 if( OTK_BUILD_EXAMPLES )
    add_subdirectory(examples)

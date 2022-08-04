@@ -59,8 +59,6 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
     friend class ObjectStoreImpl;
 
     /// Use ObjectStore::read() to obtain an ObjectStoreReader.
-    /// \param objectStore { The parent ObjectStore. }
-    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
     ObjectStoreReaderImpl( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:

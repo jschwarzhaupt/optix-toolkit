@@ -41,7 +41,7 @@ class ObjectStoreReader
     /// Options for configuring ObjectStoreReader, which is obtained via ObjectStore::getReader().
     struct Options
     {
-        /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for updates. }
+        /// If true, a thread is spawned that polls the filesystem for updates.
         bool pollForUpdates = false;
 
         /// Equality operator for options.
