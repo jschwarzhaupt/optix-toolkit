@@ -26,7 +26,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectMetadata.h"
+#include "ObjectReaders.h"
+#include "ObjectWriters.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
 #include <OptiXToolkit/Util/Stopwatch.h>
@@ -35,10 +36,9 @@
 
 #include <algorithm>
 #include <random>
-#include <thread>
 #include <time.h>
 
-// #define PERF_TESTING
+#define PERF_TESTING
 #ifdef PERF_TESTING
 #define PRINTF_INFO
 #define PRINTF_STATS printf
@@ -48,184 +48,6 @@
 #endif
 
 using namespace sceneDB;
-
-class ObjectWriters
-{
-  public:
-    ObjectWriters( std::shared_ptr<ObjectStore> store,
-                   const std::vector<size_t>&   objectSizes,
-                   unsigned int                 numThreads = std::thread::hardware_concurrency() )
-        : m_store( store )
-        , m_objectSizes( objectSizes )
-    {
-        m_threads.reserve( numThreads );
-
-        // Pre-allocate an object buffer for each thread, sized to the maximum object size, filled with
-        // the thread number (so we can detect partial/overlapping writes).
-        m_buffers.resize( numThreads );
-        size_t maxObjectSize( *std::max_element( m_objectSizes.begin(), m_objectSizes.end() ) );
-        for( unsigned int threadNum = 0; threadNum < numThreads; ++threadNum )
-        {
-            unsigned char fillValue = static_cast<unsigned char>( threadNum );
-            m_buffers[threadNum].resize( maxObjectSize, fillValue );
-        }
-    }
-
-    void write()
-    {
-        otk::Stopwatch time;
-
-        // Create the ObjectStoreWriter.
-        m_writer = m_store->getWriter();
-        
-        // Start threads.
-        ASSERT_TRUE( m_threads.empty() );
-        for( unsigned int i = 0; i < m_threads.capacity(); ++i )
-        {
-            m_threads.emplace_back( &ObjectWriters::worker, this, i );
-        }
-
-        // Wait for threads to complete.
-        for( std::thread& thread : m_threads )
-        {
-            thread.join();
-        }
-
-        // Destroy the ObjectStoreWriter.
-        m_writer.reset();
-
-        double elapsed = time.elapsed();
-        float totalSizeMB = std::accumulate(m_objectSizes.begin(), m_objectSizes.end(), 0UL) / (1024 * 1024.f);
-        PRINTF_INFO( "Wrote %g MB in %g msec (%g MB/s)\n", totalSizeMB, elapsed * 1000.0, totalSizeMB / elapsed );
-        PRINTF_STATS( "%zu %g #write, size=%zu\n", m_threads.size(), totalSizeMB / elapsed, m_objectSizes[0] );
-    }
-
-  private:
-    std::shared_ptr<ObjectStore>       m_store;
-    std::shared_ptr<ObjectStoreWriter> m_writer;
-    const std::vector<size_t>&         m_objectSizes;
-    std::vector<std::thread>           m_threads;
-    std::vector<std::vector<char>>     m_buffers;
-    std::atomic<int>                   m_nextObject = 0;
-
-    void worker( unsigned int threadNum )
-    {
-        try
-        {
-            for( int objectNum = m_nextObject++; objectNum < m_objectSizes.size(); objectNum = m_nextObject++ )
-            {
-                // Insert the object using the size as the key.  The per-thread buffer has already
-                // been sized and filled.
-                size_t size = m_objectSizes[objectNum];
-                const std::vector<char>& buffer = m_buffers[threadNum];
-                m_writer->insert( size, buffer.data(), size );
-            }
-        }
-        catch( const std::exception& e )
-        {
-            std::cerr << "Error: " << e.what() << std::endl;
-            std::terminate();
-        }
-    }
-};
-
-class ObjectReaders
-{
-  public:
-    ObjectReaders( std::shared_ptr<ObjectStore> store,
-                   const std::vector<size_t>&   objectSizes,
-                   bool                         validateData,
-                   unsigned int                 numThreads = std::thread::hardware_concurrency() )
-        : m_store( store )
-        , m_objectSizes( objectSizes )
-        , m_validateData( validateData )
-    {
-        m_threads.reserve( numThreads );
-
-        // Pre-allocate an object buffer for each thread, sized to the maximum object size
-        m_buffers.resize( numThreads );
-        size_t maxObjectSize( *std::max_element( m_objectSizes.begin(), m_objectSizes.end() ) );
-        for( unsigned int threadNum = 0; threadNum < numThreads; ++threadNum )
-        {
-            m_buffers[threadNum].resize( maxObjectSize );
-        }
-    }
-
-    void read()
-    {
-        // Create the ObjectStoreReader.
-        otk::Stopwatch indexTimer;
-        m_reader = m_store->getReader();
-
-        // Print object index read stats.
-        double indexTime = indexTimer.elapsed();
-        float indexSizeMB = m_objectSizes.size() * sizeof( ObjectMetadata ) / (1024 * 1024.f);
-        PRINTF_INFO( "Object index: read %g MB (%zu entries) in %g msec (%g MB/s)\n", indexSizeMB, m_objectSizes.size(),
-                     indexTime * 1000.0, indexSizeMB / indexTime );
-        
-        // Start threads.
-        otk::Stopwatch dataTimer;
-        ASSERT_TRUE( m_threads.empty() );
-        for( unsigned int i = 0; i < m_threads.capacity(); ++i )
-        {
-            m_threads.emplace_back( &ObjectReaders::worker, this, i );
-        }
-
-        // Wait for threads to complete.
-        for( std::thread& thread : m_threads )
-        {
-            thread.join();
-        }
-
-        // Destroy the ObjectStoreReader.
-        m_reader.reset();
-
-        // Print object data read stats.
-        double dataTime = dataTimer.elapsed();
-        float totalSizeMB = std::accumulate( m_objectSizes.begin(), m_objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
-        PRINTF_INFO( "Object data: read %g MB in %g msec (%g MB/s)\n", totalSizeMB, dataTime * 1000.0, totalSizeMB / dataTime );
-        PRINTF_STATS( "%zu %g #read, size=%zu\n", m_threads.size(), totalSizeMB / dataTime, m_objectSizes[0] );
-    }
-
-  private:
-    std::shared_ptr<ObjectStore>       m_store;
-    const std::vector<size_t>&         m_objectSizes;
-    bool                               m_validateData;
-    std::shared_ptr<ObjectStoreReader> m_reader;
-    std::vector<std::thread>           m_threads;
-    std::vector<std::vector<char>>     m_buffers;
-    std::atomic<int>                   m_nextObject = 0;
-
-    void worker( unsigned int threadNum )
-    {
-        try
-        {
-            for( int objectNum = m_nextObject++; objectNum < m_objectSizes.size(); objectNum = m_nextObject++ )
-            {
-                // Find the object using the size as the key.  The per-thread buffer has already
-                // been sized.
-                size_t size = m_objectSizes[objectNum];
-                std::vector<char>& buffer = m_buffers[threadNum];
-                size_t actualSize;
-                EXPECT_TRUE( m_reader->find( size, buffer.data(), size, actualSize ) );
-                EXPECT_EQ( size, actualSize );
-
-                // Optionally verify that the object was filled consistently.
-                if (m_validateData)
-                {
-                    char   fillValue = buffer[0];
-                    size_t count     = std::count( buffer.begin(), buffer.begin() + size, fillValue );
-                    EXPECT_EQ( size, count );
-                }
-            }
-        }
-        catch( const std::exception& e )
-        {
-            std::cerr << "Error: " << e.what() << std::endl;
-            std::terminate();
-        }
-    }
-};
 
 struct TestParams
 {
@@ -273,28 +95,51 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     const TestParams& params = GetParam();
 
     // Create vector of object sizes.
-    std::vector<size_t> sizes;
+    std::vector<size_t> objectSizes;
     if( params.fixedObjectSize )
     {
         PRINTF_INFO( "numThreads = %i, numObjects=%zu, fixedObjectSize=%zu\n", params.numThreads, params.numObjects,
                      params.fixedObjectSize );
-        sizes.resize( params.numObjects, params.fixedObjectSize );
+        objectSizes.resize( params.numObjects, params.fixedObjectSize );
     }
     else
     {
         // Create vector of random object sizes.
         PRINTF_INFO( "numThreads=%i, numObjects=%zu, minObjectSize=%zu, maxObjectSize=%zu\n", params.numThreads,
                      params.numObjects, params.minObjectSize, params.maxObjectSize );
-        fillRandom( sizes, params.numObjects, params.minObjectSize, params.maxObjectSize );
+        fillRandom( objectSizes, params.numObjects, params.minObjectSize, params.maxObjectSize );
     }
 
     // Write the objects.  The writer is scoped to ensure that it's closed properly.
-    ObjectWriters writers( m_store, sizes, params.numThreads );
+    ObjectWriters writers( m_store, objectSizes, params.numThreads );
+    otk::Stopwatch time;
     writers.write();
 
+    // Report writer stats.
+    double elapsed     = time.elapsed();
+    float  writeSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
+    PRINTF_INFO( "Wrote %g MB in %g msec (%g MB/s)\n", writeSizeMB, elapsed * 1000.0, writeSizeMB / elapsed );
+    PRINTF_STATS( "%i %g #write, size=%zu\n", params.numThreads, writeSizeMB / elapsed, objectSizes[0] );
+
+    // Construct ObjectReaders, which reads the object metadata file.
+    otk::Stopwatch metadataTimer;
+    ObjectReaders  readers( m_store, objectSizes, /*validateData=*/params.validateData, params.numThreads );
+
+    // Print object metadata read stats.
+    double metadataTime   = metadataTimer.elapsed();
+    float  metadataSizeMB = objectSizes.size() * sizeof( sceneDB::ObjectMetadata ) / ( 1024 * 1024.f );
+    PRINTF_INFO( "Object metadata: read %g MB (%zu entries) in %g msec (%g MB/s)\n", metadataSizeMB, objectSizes.size(),
+                 metadataTime * 1000.0, metadataSizeMB / metadataTime );
+
     // Read the objects, validating their contents.
-    ObjectReaders readers( m_store, sizes, /*validateData=*/ params.validateData, params.numThreads );
+    otk::Stopwatch dataTimer;
     readers.read();
+
+    // Print object data read stats.
+    double dataTime    = dataTimer.elapsed();
+    float  readSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
+    PRINTF_INFO( "Object data: read %g MB in %g msec (%g MB/s)\n", readSizeMB, dataTime * 1000.0, readSizeMB / dataTime );
+    PRINTF_STATS( "%i %g #read, size=%zu\n", params.numThreads, readSizeMB / dataTime, objectSizes[0] );
 }
 
 unsigned int g_maxThreads = std::thread::hardware_concurrency();
@@ -309,7 +154,7 @@ std::vector<TestParams> g_params{
 std::vector<TestParams> g_params;
 int initParams()
 {
-#if 0
+#if 1
     // Test throughput vs. object size.
     unsigned int numThreads = 1;
     for( size_t size = 64; size <= 1024; size += 64 )
