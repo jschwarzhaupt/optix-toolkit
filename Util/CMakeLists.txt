@@ -74,6 +74,7 @@ target_include_directories(Util PUBLIC
 
 target_link_libraries(Util PRIVATE
   OptiX::OptiX
+  CUDA::cuda_driver
   CUDA::cudart_static
   )
 

@@ -53,9 +53,7 @@ add_library( ImageSource SHARED
   src/DeviceMandelbrotImage.cpp
   src/DeviceMandelbrotImageKernels.cu
   src/EXRReader.cpp
-  src/Exception.h
   src/ImageSource.cpp
-  src/Stopwatch.h
   src/TextureInfo.cpp
   )
 
@@ -109,6 +107,7 @@ target_link_libraries( ImageSource
   CUDA::cudart_static
   ${CMAKE_DL_LIBS}  
   PRIVATE
+  OptiXToolkit::Util
   OpenEXR_OTK
   )
 

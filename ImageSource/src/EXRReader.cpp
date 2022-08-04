@@ -27,9 +27,8 @@
 //
 
 #include <OptiXToolkit/ImageSource/EXRReader.h>
-
-#include "Exception.h"
-#include "Stopwatch.h"
+#include <OptiXToolkit/Util/Exception.h>
+#include <OptiXToolkit/Util/Stopwatch.h>
 
 #include <cuda_runtime.h>
 
@@ -73,7 +72,7 @@ CUarray_format pixelTypeToArrayFormat( PixelType type )
         case FLOAT:
             return CU_AD_FORMAT_FLOAT;
         default:
-            DEMAND_ASSERT_MSG( false, "Invalid EXR pixel type" );
+            OTK_ASSERT_MSG( false, "Invalid EXR pixel type" );
             return CU_AD_FORMAT_FLOAT;
     }
 }
@@ -82,7 +81,7 @@ CUarray_format pixelTypeToArrayFormat( PixelType type )
 void EXRReader::open( TextureInfo* info )
 {
     {
-        Stopwatch stopwatch;
+        otk::Stopwatch stopwatch;
         std::unique_lock<std::mutex> lock( m_mutex );
 
         // Check to see if the image is already open
@@ -99,7 +98,7 @@ void EXRReader::open( TextureInfo* info )
 
                 // Note that non-power-of-two EXR files often have one fewer miplevel than one would expect
                 // (they don't round up from 1+log2(max(width/height))).
-                DEMAND_ASSERT( m_tiledInputFile->numLevels() != 0 );
+                OTK_ASSERT( m_tiledInputFile->numLevels() != 0 );
                 m_info.numMipLevels = m_tiledInputFile->numLevels();
                 m_tileWidth         = m_tiledInputFile->tileXSize();
                 m_tileHeight        = m_tiledInputFile->tileYSize();
@@ -131,7 +130,7 @@ void EXRReader::open( TextureInfo* info )
                 R = channels.findChannel(m_firstChannelName); // Single channel files may name it 'Y' (for luminance)
             }
 
-            DEMAND_ASSERT_MSG( R, "First channel is missing in EXR file" );
+            OTK_ASSERT_MSG( R, "First channel is missing in EXR file" );
             m_pixelType   = R->type;
             m_info.format = pixelTypeToArrayFormat( static_cast<Imf::PixelType>( m_pixelType ) );
 
@@ -213,8 +212,8 @@ void EXRReader::close()
 
 void EXRReader::readActualTile( char* dest, unsigned int rowPitch, unsigned int mipLevel, unsigned int tileX, unsigned int tileY )
 {
-    DEMAND_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
-    DEMAND_ASSERT( !m_inputFile );
+    OTK_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
+    OTK_ASSERT( !m_inputFile );
 
     const Box2i dw = m_tiledInputFile->dataWindowForTile( tileX, tileY, mipLevel );
 
@@ -234,8 +233,8 @@ void EXRReader::readActualTile( char* dest, unsigned int rowPitch, unsigned int 
 
 void EXRReader::readScanlineData( char* dest )
 {
-    DEMAND_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
-    DEMAND_ASSERT( !m_tiledInputFile );
+    OTK_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
+    OTK_ASSERT( !m_tiledInputFile );
 
     const Box2i dw = m_inputFile->header().dataWindow();
 
@@ -256,11 +255,11 @@ void EXRReader::readScanlineData( char* dest )
 void EXRReader::readTile( char* dest, unsigned int mipLevel, unsigned int tileX, unsigned int tileY, unsigned int tileWidth, unsigned int tileHeight, CUstream stream )
 {
     std::unique_lock<std::mutex> lock( m_mutex );
-    DEMAND_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
-    DEMAND_ASSERT_MSG( !m_inputFile, "Attempting to read tiled data from scanline image." );
+    OTK_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
+    OTK_ASSERT_MSG( !m_inputFile, "Attempting to read tiled data from scanline image." );
 
     // Stats tracking
-    Stopwatch stopwatch;
+    otk::Stopwatch stopwatch;
 
     // We require that the requested tile size is an integer multiple of the EXR tile size.
     const unsigned int actualTileWidth  = m_tiledInputFile->tileXSize();
@@ -271,7 +270,7 @@ void EXRReader::readTile( char* dest, unsigned int mipLevel, unsigned int tileX,
         std::stringstream str;
         str << "Unsupported EXR tile size (" << actualTileWidth << "x" << actualTileHeight << ").  Expected "
             << tileWidth << "x" << tileHeight << " (or a whole fraction thereof) for this pixel format";
-        throw Exception( str.str().c_str() );
+        throw otk::Exception( str.str().c_str() );
     }
                 
     const unsigned int actualTileX    = tileX * tileWidth / actualTileWidth;
@@ -308,10 +307,10 @@ void EXRReader::readTile( char* dest, unsigned int mipLevel, unsigned int tileX,
 void EXRReader::readMipLevel( char* dest, unsigned int mipLevel, unsigned int expectedWidth, unsigned int expectedHeight, CUstream stream )
 {
     std::unique_lock<std::mutex> lock( m_mutex );
-    DEMAND_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
+    OTK_ASSERT_MSG( isOpen(), "Attempting to read from image that isn't open." );
 
     // Stats tracking
-    Stopwatch stopwatch;
+    otk::Stopwatch stopwatch;
     const Box2i dw = m_tiledInputFile ? m_tiledInputFile->dataWindowForLevel( mipLevel, mipLevel ) : m_inputFile->header().dataWindow();
 
     if( m_inputFile )
@@ -319,9 +318,9 @@ void EXRReader::readMipLevel( char* dest, unsigned int mipLevel, unsigned int ex
         // Get window offset and dimensions.
         const int width  = dw.max.x - dw.min.x + 1;
         const int height = dw.max.y - dw.min.y + 1;
-        DEMAND_ASSERT( width  == static_cast<int>( expectedWidth ) );
-        DEMAND_ASSERT( height == static_cast<int>( expectedHeight ) );
-        DEMAND_ASSERT( mipLevel == 0 );
+        OTK_ASSERT( width  == static_cast<int>( expectedWidth ) );
+        OTK_ASSERT( height == static_cast<int>( expectedHeight ) );
+        OTK_ASSERT( mipLevel == 0 );
 
         readScanlineData( dest );
                 
@@ -336,8 +335,8 @@ void EXRReader::readMipLevel( char* dest, unsigned int mipLevel, unsigned int ex
     {
         // Get miplevel data window offset and dimensions.
         const int width = dw.max.x - dw.min.x + 1;
-        DEMAND_ASSERT( width == static_cast<int>( expectedWidth ) );
-        DEMAND_ASSERT( ( dw.max.y - dw.min.y + 1 ) == static_cast<int>( expectedHeight ) );
+        OTK_ASSERT( width == static_cast<int>( expectedWidth ) );
+        OTK_ASSERT( ( dw.max.y - dw.min.y + 1 ) == static_cast<int>( expectedHeight ) );
 
         // Compute base pointer and strides for frame buffer
         const unsigned int bytesPerPixel = getBytesPerChannel( m_info.format ) * m_info.numChannels;

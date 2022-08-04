@@ -79,7 +79,7 @@ void optixCheckLog( OptixResult res, const char* log, size_t sizeof_log, size_t 
     }
 }
 
-void optixCheckNoThrow( OptixResult res, const char* call, const char* file, unsigned int line )
+void optixCheckNoThrow( OptixResult res, const char* call, const char* file, unsigned int line ) noexcept
 {
     if( res != OPTIX_SUCCESS )
     {
@@ -99,6 +99,39 @@ void cudaCheck( cudaError_t error, const char* call, const char* file, unsigned 
     }
 }
 
+void cudaCheckNoThrow( cudaError_t error, const char* call, const char* file, unsigned int line ) noexcept
+{
+    if( error != cudaSuccess )
+    {
+        std::cerr << "CUDA call (" << call << " ) failed with error: '" << cudaGetErrorString( error ) << "' (" << file
+                  << ":" << line << ")\n";
+        std::terminate();
+    }
+}
+
+void cudaCheck( CUresult result, const char* expr, const char* file, unsigned int line )
+{
+    if( result != CUDA_SUCCESS )
+    {
+        const char* errorStr;
+        cuGetErrorString( result, &errorStr );
+        std::stringstream ss;
+        ss << "CUDA call (" << expr << " ) failed with error: '" << errorStr << "' (" << file << ":" << line << ")\n";
+        throw Exception( ss.str().c_str() );
+    }
+}
+
+void cudaCheckNoThrow( CUresult result, const char* expr, const char* file, unsigned int line ) noexcept
+{
+    if( result != CUDA_SUCCESS )
+    {
+        const char* errorStr;
+        cuGetErrorString( result, &errorStr );
+        std::cerr << "CUDA call (" << expr << " ) failed with error: '" << errorStr << "' (" << file << ":" << line << ")\n";
+        std::terminate();
+    }
+}
+
 void cudaSyncCheck( const char* file, unsigned int line )
 {
     cudaDeviceSynchronize();
@@ -108,16 +141,6 @@ void cudaSyncCheck( const char* file, unsigned int line )
         std::stringstream ss;
         ss << "CUDA error on synchronize with error '" << cudaGetErrorString( error ) << "' (" << file << ":" << line << ")\n";
         throw Exception( ss.str().c_str() );
-    }
-}
-
-void cudaCheckNoThrow( cudaError_t error, const char* call, const char* file, unsigned int line )
-{
-    if( error != cudaSuccess )
-    {
-        std::cerr << "CUDA call (" << call << " ) failed with error: '" << cudaGetErrorString( error ) << "' (" << file
-                  << ":" << line << ")\n";
-        std::terminate();
     }
 }
 

@@ -28,7 +28,7 @@
 
 #include <OptiXToolkit/ImageSource/DeviceMandelbrotImage.h>
 
-#include "Exception.h"
+#include <OptiXToolkit/Util/Exception.h>
 
 namespace imageSource {
 
@@ -84,12 +84,12 @@ void DeviceMandelbrotImage::readTile( char*        dest,
                                       unsigned int tileHeight,
                                       CUstream     stream )
 {
-    DEMAND_ASSERT_MSG( mipLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
+    OTK_ASSERT_MSG( mipLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
 
     const unsigned int levelWidth  = std::max( 1u, m_params.width >> mipLevel );
     const unsigned int levelHeight = std::max( 1u, m_params.height >> mipLevel );
 
-    DEMAND_ASSERT_MSG( levelWidth > tileX * tileWidth && levelHeight > tileY * tileHeight,
+    OTK_ASSERT_MSG( levelWidth > tileX * tileWidth && levelHeight > tileY * tileHeight,
                        "Requesting tile outside image bounds." );
 
     MandelbrotParams params = m_params;
@@ -112,12 +112,12 @@ void DeviceMandelbrotImage::readTile( char*        dest,
 
 void DeviceMandelbrotImage::readMipLevel( char* dest, unsigned int mipLevel, unsigned int width, unsigned int height, CUstream stream )
 {
-    DEMAND_ASSERT_MSG( mipLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
+    OTK_ASSERT_MSG( mipLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
 
     const unsigned int levelWidth  = std::max( 1u, m_info.width >> mipLevel );
     const unsigned int levelHeight = std::max( 1u, m_info.height >> mipLevel );
 
-    DEMAND_ASSERT_MSG( levelWidth == width && levelHeight == height, "Mismatch between parameter and calculated mip level size." );
+    OTK_ASSERT_MSG( levelWidth == width && levelHeight == height, "Mismatch between parameter and calculated mip level size." );
 
     MandelbrotParams params = m_params;
     params.width            = levelWidth;
@@ -137,7 +137,7 @@ void DeviceMandelbrotImage::readMipTail( char*        dest,
                       unsigned int pixelSizeInBytes,
                       CUstream     stream ) 
 {
-    DEMAND_ASSERT_MSG( mipTailFirstLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
+    OTK_ASSERT_MSG( mipTailFirstLevel < m_info.numMipLevels, "Attempt to read from non-existent mip-level." );
 
     const unsigned int levelWidth  = mipLevelDims[mipTailFirstLevel].x;
     const unsigned int levelHeight = mipLevelDims[mipTailFirstLevel].y;

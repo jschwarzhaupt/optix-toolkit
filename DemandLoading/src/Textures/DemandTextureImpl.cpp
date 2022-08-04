@@ -26,13 +26,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include <OptiXToolkit/Util/Stopwatch.h>
+
 #include "Textures/DemandTextureImpl.h"
 #include "DemandLoaderImpl.h"
 #include "Memory/TilePool.h"
 #include "PageTableManager.h"
 #include "Textures/TextureRequestHandler.h"
 #include "Util/Math.h"
-#include "Util/Stopwatch.h"
 
 #include <OptiXToolkit/DemandLoading/TileIndexing.h>
 #include <OptiXToolkit/ImageSource/ImageSource.h>

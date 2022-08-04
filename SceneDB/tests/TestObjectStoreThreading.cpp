@@ -29,6 +29,7 @@
 #include "ObjectMetadata.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
+#include <OptiXToolkit/Util/Stopwatch.h>
 
 #include <gtest/gtest.h>
 
@@ -47,25 +48,6 @@
 #endif
 
 using namespace sceneDB;
-
-class Stopwatch
-{
-  public:
-    Stopwatch()
-        : startTime( std::chrono::high_resolution_clock::now() )
-    {
-    }
-
-    /// Returns the time in seconds since the Stopwatch was constructed.
-    double elapsed() const
-    {
-        using namespace std::chrono;
-        return duration_cast<duration<double>>( high_resolution_clock::now() - startTime ).count();
-    }
-
-  private:
-    std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
-};
 
 class ObjectWriters
 {
@@ -91,7 +73,7 @@ class ObjectWriters
 
     void write()
     {
-        Stopwatch time;
+        otk::Stopwatch time;
 
         // Create the ObjectStoreWriter.
         m_writer = m_store->getWriter();
@@ -172,7 +154,7 @@ class ObjectReaders
     void read()
     {
         // Create the ObjectStoreReader.
-        Stopwatch indexTimer;
+        otk::Stopwatch indexTimer;
         m_reader = m_store->getReader();
 
         // Print object index read stats.
@@ -182,7 +164,7 @@ class ObjectReaders
                      indexTime * 1000.0, indexSizeMB / indexTime );
         
         // Start threads.
-        Stopwatch dataTimer;
+        otk::Stopwatch dataTimer;
         ASSERT_TRUE( m_threads.empty() );
         for( unsigned int i = 0; i < m_threads.capacity(); ++i )
         {

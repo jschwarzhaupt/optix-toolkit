@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <optix_types.h>
 
@@ -124,13 +125,15 @@ void optixCheck( OptixResult res, const char* call, const char* file, unsigned i
 
 void optixCheckLog( OptixResult res, const char* log, size_t sizeof_log, size_t sizeof_log_returned, const char* call, const char* file, unsigned int line );
 
-void optixCheckNoThrow( OptixResult res, const char* call, const char* file, unsigned int line );
+void optixCheckNoThrow( OptixResult res, const char* call, const char* file, unsigned int line ) noexcept;
 
 void cudaCheck( cudaError_t error, const char* call, const char* file, unsigned int line );
+void cudaCheck( CUresult result, const char* call, const char* file, unsigned int line );
+
+void cudaCheckNoThrow( cudaError_t error, const char* call, const char* file, unsigned int line ) noexcept;
+void cudaCheckNoThrow( CUresult result, const char* call, const char* file, unsigned int line ) noexcept;
 
 void cudaSyncCheck( const char* file, unsigned int line );
-
-void cudaCheckNoThrow( cudaError_t error, const char* call, const char* file, unsigned int line );
 
 void assertCond( bool result, const char* cond, const char* file, unsigned int line );
 

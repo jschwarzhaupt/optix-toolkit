@@ -107,7 +107,6 @@ add_library( DemandLoading SHARED
   src/Util/Math.h
   src/Util/MutexArray.h
   src/Util/NVTXProfiling.h
-  src/Util/Stopwatch.h
   src/Util/TraceFile.cpp
   src/Util/TraceFile.h
   )
@@ -195,6 +194,7 @@ target_include_directories( DemandLoading
 target_link_libraries( DemandLoading
   PUBLIC
   OptiXToolkit::ImageSource
+  OptiXToolkit::Util
   OptiX::OptiX
   CUDA::cuda_driver
   CUDA::cudart_static

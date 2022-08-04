@@ -31,7 +31,7 @@
 
 #include <chrono>
 
-namespace demandLoading {
+namespace otk {
 
 class Stopwatch
 {
@@ -52,4 +52,4 @@ class Stopwatch
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 };
 
-}  // end namespace demandLoading
+}  // end namespace otk

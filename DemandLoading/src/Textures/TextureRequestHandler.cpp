@@ -30,11 +30,12 @@
 #include "DemandLoaderImpl.h"
 #include "PagingSystem.h"
 #include "Textures/DemandTextureImpl.h"
+#include "TransferBufferDesc.h"
 #include "Util/NVTXProfiling.h"
 
 #include <OptiXToolkit/DemandLoading/TileIndexing.h>
 
-#include "TransferBufferDesc.h"
+#include <sstream>
 
 namespace demandLoading {
 
@@ -98,7 +99,7 @@ void TextureRequestHandler::fillTileRequest( unsigned int deviceIndex, CUstream 
     {
         std::stringstream ss;
         ss << "readTile call failed: " << e.what() << ": " << __FILE__ << " (" << __LINE__ << ")";
-        throw Exception( ss.str().c_str() );
+        throw otk::Exception( ss.str().c_str() );
     }
 
     // Copy data from transfer buffer to the sparse texture on the device
@@ -145,7 +146,7 @@ void TextureRequestHandler::fillMipTailRequest( unsigned int deviceIndex, CUstre
     {
         std::stringstream ss;
         ss << "readMipTail call failed: " << e.what() << ": " << __FILE__ << " (" << __LINE__ << ")";
-        throw Exception( ss.str().c_str() );
+        throw otk::Exception( ss.str().c_str() );
     }
 
     CUmemGenericAllocationHandle handle;

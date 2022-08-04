@@ -63,33 +63,6 @@ typedef SbtRecord<int>        HitGroupSbtRecord;
 
 namespace {  // anonymous
 
-inline void check( OptixResult res, const char* call, const char* file, unsigned int line )
-{
-    if( res != OPTIX_SUCCESS )
-    {
-        std::stringstream s;
-        s << "Optix call in " << file << ", line " << line << " (" << call << ") failed with code " << res;
-        throw std::runtime_error( s.str() );
-    }
-}
-
-#define OPTIX_CHECK( call ) check( call, #call, __FILE__, __LINE__ )
-
-inline void syncCheck( const char* file, unsigned int line )
-{
-    cudaDeviceSynchronize();
-    const cudaError_t error = cudaGetLastError();
-    if( error != cudaSuccess )
-    {
-        std::stringstream s;
-        s << "CUDA sync check in " << file << ": line " << line << " failed with code " << error << ": " << cudaGetErrorString( error );
-        throw std::runtime_error( s.str() );
-    }
-}
-
-#define OPTIX_CHECK( call ) check( call, #call, __FILE__, __LINE__ )
-#define CUDA_SYNC_CHECK() syncCheck( __FILE__, __LINE__ )
-
 //------------------------------------------------------------------------------
 // Helper functions to interpret texture footprints
 

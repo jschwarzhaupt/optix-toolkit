@@ -28,10 +28,11 @@
 
 #include "DemandLoaderImpl.h"
 
+#include <OptiXToolkit/Util/Stopwatch.h>
+
 #include "RequestProcessor.h"
 #include "Util/Exception.h"
 #include "Util/NVTXProfiling.h"
-#include "Util/Stopwatch.h"
 #include "Util/TraceFile.h"
 #include "TicketImpl.h"
 
@@ -109,7 +110,7 @@ DemandLoaderImpl::DemandLoaderImpl( const Options& options )
     if( m_devices.empty() )
     {
         // FIXME: log a warning here that we are falling back to dense textures if m_options.useSparseTextures is true.
-        //throw Exception( "No devices that support CUDA sparse textures were found (sm_60+ required)." );
+        //throw otk::Exception( "No devices that support CUDA sparse textures were found (sm_60+ required)." );
         m_options.useSparseTextures = false;
         for( unsigned int deviceIndex = 0; deviceIndex < m_numDevices; ++deviceIndex )
             m_devices.push_back( deviceIndex );
@@ -256,7 +257,7 @@ bool DemandLoaderImpl::launchPrepare( unsigned int deviceIndex, CUstream stream,
 // Process page requests.
 Ticket DemandLoaderImpl::processRequests( unsigned int deviceIndex, CUstream stream, const DeviceContext& context )
 {
-    Stopwatch stopwatch;
+    otk::Stopwatch stopwatch;
     SCOPED_NVTX_RANGE_FUNCTION_NAME();
     std::unique_lock<std::mutex> lock( m_mutex );
 

@@ -31,6 +31,8 @@
 #include "RequestHandler.h"
 #include "TicketImpl.h"
 
+#include <iostream>
+
 namespace demandLoading {
 
 void RequestProcessor::start( unsigned int maxThreads )

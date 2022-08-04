@@ -32,6 +32,7 @@
 #include "Util/Exception.h"
 
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 namespace demandLoading {
 

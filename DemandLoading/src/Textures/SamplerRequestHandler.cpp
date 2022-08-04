@@ -26,17 +26,19 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include <OptiXToolkit/Util/Exception.h>
+
 #include "Textures/SamplerRequestHandler.h"
 #include "DemandLoaderImpl.h"
 #include "PagingSystem.h"
 #include "Textures/DemandTextureImpl.h"
+#include "TransferBufferDesc.h"
 #include "Util/NVTXProfiling.h"
 
-#include "TransferBufferDesc.h"
+#include <OptiXToolkit/DemandLoading/Paging.h>  // for NON_EVICTABLE_LRU_VAL
 
 #include <algorithm>
-
-#include <OptiXToolkit/DemandLoading/Paging.h>  // for NON_EVICTABLE_LRU_VAL
+#include <sstream>
 
 namespace demandLoading {
 
@@ -80,7 +82,7 @@ void SamplerRequestHandler::fillRequest( unsigned int deviceIndex, CUstream stre
     {
         std::stringstream ss;
         ss << "ImageSource::init() failed: " << e.what() << ": " << __FILE__ << " (" << __LINE__ << ")";
-        throw Exception(ss.str().c_str());
+        throw otk::Exception(ss.str().c_str());
     }
 
     // For a dense texture, the whole thing has to be loaded, so load it now

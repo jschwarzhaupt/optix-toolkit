@@ -35,6 +35,7 @@
 #include <OptiXToolkit/ImageSource/EXRReader.h>
 
 #include <cassert>
+#include <sstream>
 
 namespace demandLoading {
 
@@ -88,8 +89,7 @@ void TraceFileWriter::recordTexture( std::shared_ptr<imageSource::ImageSource> i
     // For now, only EXRReader can be serialized.
     std::shared_ptr<imageSource::EXRReader> exrReader( std::dynamic_pointer_cast<imageSource::EXRReader>( imageSource ) );
     if( !exrReader )
-        throw Exception( "Cannot serialize ImageSource (expected EXRReader)" );
-
+        throw otk::Exception( "Cannot serialize ImageSource (expected EXRReader)" );
     write( TEXTURE );
     exrReader->serialize( m_file );
 
@@ -177,7 +177,7 @@ class TraceFileReader
             }
             else
             {
-                throw Exception( "Unknown record type in trace file" );
+                throw otk::Exception( "Unknown record type in trace file" );
             }
         }
     }
@@ -215,7 +215,7 @@ class TraceFileReader
         {
             std::stringstream stream;
             stream << "Error reading option from trace file.  Expected " << expected << ", found " << found;
-            throw Exception( stream.str().c_str() );
+            throw otk::Exception( stream.str().c_str() );
         }
         read( option );
     }
@@ -241,7 +241,7 @@ class TraceFileReader
             return m_streams[streamId];
 
         if( streamId != m_streams.size() )
-            throw Exception( "Unexpected stream id in page request trace file" );
+            throw otk::Exception( "Unexpected stream id in page request trace file" );
 
         DEMAND_CUDA_CHECK( cudaSetDevice( deviceIndex ) );
         CUstream stream;
@@ -269,7 +269,7 @@ class TraceFileReader
         assert( loaderImpl );
 
         if( !loaderImpl->isActiveDevice( deviceIndex ) )
-            throw Exception( "Required device is not present for request trace playback." );
+            throw otk::Exception( "Required device is not present for request trace playback." );
 
         CUstream stream = getStream( deviceIndex, streamId );
         Ticket ticket = loaderImpl->replayRequests( deviceIndex, stream, pageIds.data(), numPageIds );
