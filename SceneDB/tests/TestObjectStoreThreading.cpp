@@ -36,6 +36,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <numeric>
 #include <random>
 #include <time.h>
 
@@ -48,7 +49,6 @@ struct TestParams
     size_t       fixedObjectSize;
     size_t       minObjectSize;
     size_t       maxObjectSize;
-    bool         validateData;
 };
 
 class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
@@ -114,7 +114,7 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
 
     // Construct ObjectReaders, which reads the object metadata file.
     otk::Stopwatch metadataTimer;
-    ObjectReaders  readers( m_store, objectSizes, /*validateData=*/params.validateData, params.numThreads );
+    ObjectReaders  readers( m_store, objectSizes, /*validateData=*/true, params.numThreads );
 
     // Print object metadata read stats.
     double metadataTime   = metadataTimer.elapsed();
@@ -135,9 +135,9 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
 unsigned int g_maxThreads = std::thread::hardware_concurrency();
 
 std::vector<TestParams> g_params{
-    // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize, validataData
-    {1, 128, 8 * 1024, 0, 0, true},
-    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024, true},
+    // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize
+    {1, 128, 8 * 1024, 0, 0},
+    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024},
 };
 
 INSTANTIATE_TEST_SUITE_P( ThreadingTests, TestObjectStoreThreading, testing::ValuesIn( g_params ) );

@@ -55,7 +55,6 @@ if( $<TARGET_RUNTIME_DLLS:testSceneDB> )
 endif()
 
 add_executable( objectStorePerfTest
-  main.cpp
   ObjectStorePerfTest.cpp
   ObjectReaders.h
   ObjectWriters.h
