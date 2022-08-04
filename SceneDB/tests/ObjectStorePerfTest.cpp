@@ -1,4 +1,3 @@
-
 //
 // Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 //
@@ -90,15 +89,11 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     std::vector<size_t> objectSizes;
     if( params.fixedObjectSize )
     {
-        printf( "numThreads = %i, numObjects=%zu, fixedObjectSize=%zu\n", params.numThreads, params.numObjects,
-                     params.fixedObjectSize );
         objectSizes.resize( params.numObjects, params.fixedObjectSize );
     }
     else
     {
         // Create vector of random object sizes.
-        printf( "numThreads=%i, numObjects=%zu, minObjectSize=%zu, maxObjectSize=%zu\n", params.numThreads,
-                     params.numObjects, params.minObjectSize, params.maxObjectSize );
         fillRandom( objectSizes, params.numObjects, params.minObjectSize, params.maxObjectSize );
     }
 
@@ -110,7 +105,7 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     // Report writer stats.
     double elapsed     = time.elapsed();
     float  writeSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
-    printf( "Wrote %g MB in %g msec (%g MB/s)\n", writeSizeMB, elapsed * 1000.0, writeSizeMB / elapsed );
+    printf( "%i %g #write, size=%zu\n", params.numThreads, writeSizeMB / elapsed, objectSizes[0] );
 
     // Construct ObjectReaders, which reads the object metadata file.
     otk::Stopwatch metadataTimer;
@@ -119,8 +114,6 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     // Print object metadata read stats.
     double metadataTime   = metadataTimer.elapsed();
     float  metadataSizeMB = objectSizes.size() * sizeof( sceneDB::ObjectMetadata ) / ( 1024 * 1024.f );
-    printf( "Object metadata: read %g MB (%zu entries) in %g msec (%g MB/s)\n", metadataSizeMB, objectSizes.size(),
-                 metadataTime * 1000.0, metadataSizeMB / metadataTime );
 
     // Read the objects, validating their contents.
     otk::Stopwatch dataTimer;
@@ -129,15 +122,41 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
     // Print object data read stats.
     double dataTime    = dataTimer.elapsed();
     float  readSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
-    printf( "Object data: read %g MB in %g msec (%g MB/s)\n", readSizeMB, dataTime * 1000.0, readSizeMB / dataTime );
+    printf( "%i %g #read, size=%zu\n", params.numThreads, readSizeMB / dataTime, objectSizes[0] );
 }
 
 unsigned int g_maxThreads = std::thread::hardware_concurrency();
 
-std::vector<TestParams> g_params{
-    // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize, validataData
-    {1, 128, 8 * 1024, 0, 0, true},
-    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024, true},
-};
+std::vector<TestParams> g_params;
+int initParams()
+{
+#if 1
+    // Test throughput vs. object size.
+    unsigned int numThreads = 1;
+    for( size_t size = 64; size <= 1024; size += 64 )
+    {
+        // Params: numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize, validataData
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0, false } );
+    }
+    for( size_t size = 512; size <= 16 * 1024; size += 512 )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, size, 0, 0, false} );
+    }
+#elif 0
+    // Test 4K object throughput vs. thread count.
+    for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * g_maxThreads ); ++numThreads )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, 4 * 1024, 0, 0, false} );
+    }
+#else
+    // Test 12K object throughput vs. thread count.
+    for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * g_maxThreads ); ++numThreads )
+    {
+        g_params.push_back( TestParams{numThreads, 10000, 12 * 1024, 0, 0, false} );
+    }
+#endif
+    return 0;
+}
+int g_staticInit = initParams();
 
 INSTANTIATE_TEST_SUITE_P( ThreadingTests, TestObjectStoreThreading, testing::ValuesIn( g_params ) );

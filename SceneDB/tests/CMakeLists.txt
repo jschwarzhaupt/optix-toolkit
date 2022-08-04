@@ -53,3 +53,27 @@ if( $<TARGET_RUNTIME_DLLS:testSceneDB> )
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:testSceneDB> $<TARGET_FILE_DIR:testSceneDB>
     COMMAND_EXPAND_LISTS )
 endif()
+
+add_executable( objectStorePerfTest
+  main.cpp
+  ObjectStorePerfTest.cpp
+  ObjectReaders.h
+  ObjectWriters.h
+  )  
+
+target_include_directories( objectStorePerfTest PUBLIC
+  ../src
+  )
+
+target_link_libraries( objectStorePerfTest
+  SceneDB
+  OptiXToolkit::Util
+  gtest
+  )
+
+# Copy shared libraries that the built executable depends on.
+if( $<TARGET_RUNTIME_DLLS:objectStorePerfTest> )
+  add_custom_command( TARGET objectStorePerfTest POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:objectStorePerfTest> $<TARGET_FILE_DIR:objectStorePerfTest>
+    COMMAND_EXPAND_LISTS )
+endif()
