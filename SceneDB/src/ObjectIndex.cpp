@@ -36,6 +36,29 @@
 
 namespace sceneDB {
 
+class ObjectMetadataMap
+{
+  public:
+    using Key = uint64_t;
+
+    virtual void erase( Key key ) { m_map.erase( key ); }
+
+    virtual void insert( Key key, const ObjectMetadata& metadata ) { m_map[key] = metadata; }
+
+    virtual bool find( Key key, ObjectMetadata* result ) const
+    {
+        auto it = m_map.find( key );
+        if( it == m_map.end() )
+            return false;
+
+        *result = it->second;
+        return true;
+    }
+
+  private:
+    std::unordered_map<Key, ObjectMetadata> m_map;
+};
+
 class ObjectMetadataReader
 {
   public:
@@ -48,7 +71,7 @@ class ObjectMetadataReader
 
     ~ObjectMetadataReader() { fclose( m_file ); }
 
-    void read( std::unordered_map<ObjectIndex::Key, ObjectMetadata>* map )
+    void read( ObjectMetadataMap* map )
     {
         // Read records (using buffered I/O), updating the map.  For now we stop
         // when EOF is encountered, rather than continuing to poll for updates.
@@ -60,7 +83,7 @@ class ObjectMetadataReader
   private:
     FILE* m_file;
 
-    bool readRecord( std::unordered_map<ObjectIndex::Key, ObjectMetadata>* map )
+    bool readRecord( ObjectMetadataMap* map )
     {
         // Read one ObjectMetadata
         ObjectMetadata metadata;
@@ -81,7 +104,7 @@ class ObjectMetadataReader
         else
         {
             // Map key to ObjectMetadata.
-            (*map)[metadata.key] = metadata;
+            map->insert( metadata.key, metadata );
         }
         return true;
     }
@@ -96,18 +119,10 @@ class ObjectIndexImpl : public ObjectIndex
         ObjectMetadataReader( filename ).read( &m_map );
     }
 
-    bool find( Key key, ObjectMetadata* result ) const override
-    {
-        auto it = m_map.find( key );
-        if( it == m_map.end() )
-            return false;
-
-        *result = it->second;
-        return true;
-    }
+    bool find( Key key, ObjectMetadata* result ) const override { return m_map.find( key, result ); }
 
   private:
-    std::unordered_map<Key, ObjectMetadata> m_map;
+    ObjectMetadataMap m_map;
 };
 
 std::unique_ptr<ObjectIndex> ObjectIndex::read( const char* filename, bool pollForUpdates )
