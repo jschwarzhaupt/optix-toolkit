@@ -89,15 +89,14 @@ off_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
 
 void AppendOnlyFile::flush()
 {
+// It's not necessary to flush OS buffers to disk, but this is how it's done.
+#if 0
 #ifdef WIN32
     int status = _commit( m_descriptor );
 #else
     int status = fdatasync( m_descriptor );
 #endif
-    if( status )
-    {
-        throw otk::Exception( "Failed to flush AppendOnlyFile", errno );
-    }
+#endif
 }
 
 }  // namespace sceneDB
