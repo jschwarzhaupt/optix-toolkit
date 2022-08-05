@@ -84,76 +84,60 @@ class LockingObjectMetadataMap : public ObjectMetadataMap
     mutable std::mutex m_mutex;
 };
 
-class ObjectMetadataReader
+
+ObjectIndex::ObjectIndex( const char* filename, bool pollForUpdates )
+    : m_map( pollForUpdates ? new LockingObjectMetadataMap : new ObjectMetadataMap )
+    , m_file( fopen( filename, "rb" ) )
 {
-  public:
-    ObjectMetadataReader( const char* filename )
-        : m_file( fopen( filename, "rb" ) )
+    OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
+    if( m_file == nullptr )
+        throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+    readFile();
+}
+
+ObjectIndex::~ObjectIndex()
+{
+    fclose( m_file );
+}
+
+bool ObjectIndex::find( Key key, ObjectMetadata* result ) const
+{
+    return m_map->find( key, result );
+}
+
+void ObjectIndex::readFile()
+{
+    // Read records (using buffered I/O), updating the map.  For now we stop
+    // when EOF is encountered, rather than continuing to poll for updates.
+    while( readRecord() )
     {
-        if( m_file == nullptr )
-            throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
     }
+}
 
-    ~ObjectMetadataReader() { fclose( m_file ); }
-
-    void read( ObjectMetadataMap* map )
+bool ObjectIndex::readRecord()
+{
+    // Read one ObjectMetadata
+    ObjectMetadata metadata;
+    size_t         itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, m_file );
+    if( itemsRead < 1 )
     {
-        // Read records (using buffered I/O), updating the map.  For now we stop
-        // when EOF is encountered, rather than continuing to poll for updates.
-        while( readRecord( map ) )
-        {
-        }
-    }
-
-  private:
-    FILE* m_file;
-
-    bool readRecord( ObjectMetadataMap* map )
-    {
-        // Read one ObjectMetadata
-        ObjectMetadata metadata;
-        size_t         itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, m_file );
-        if( itemsRead < 1 )
-        {
-            if( ferror( m_file ) )
-                throw otk::Exception( "Error reading object metadata file" );
-            else
-                return false;  // EOF
-        }
-
-        // Special case: a sentinel offset value denotes object removal.
-        if( metadata.offset == ObjectMetadata::REMOVED )
-        {
-            map->erase( metadata.key );
-        }
+        if( ferror( m_file ) )
+            throw otk::Exception( "Error reading object metadata file" );
         else
-        {
-            // Map key to ObjectMetadata.
-            map->insert( metadata.key, metadata );
-        }
-        return true;
+            return false;  // EOF
     }
-};
 
-class ObjectIndexImpl : public ObjectIndex
-{
-  public:
-    ObjectIndexImpl( const char* filename, bool pollForUpdates )
-        : m_map( pollForUpdates ? new LockingObjectMetadataMap : new ObjectMetadataMap )
+    // Special case: a sentinel offset value denotes object removal.
+    if( metadata.offset == ObjectMetadata::REMOVED )
     {
-        OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
-        ObjectMetadataReader( filename ).read( m_map.get() );
+        m_map->erase( metadata.key );
     }
-
-    bool find( Key key, ObjectMetadata* result ) const override { return m_map->find( key, result ); }
-
-  private:
-    std::unique_ptr<ObjectMetadataMap> m_map;
-};
-
-std::unique_ptr<ObjectIndex> ObjectIndex::read( const char* filename, bool pollForUpdates )
-{
-    return std::unique_ptr<ObjectIndex>( new ObjectIndexImpl( filename, pollForUpdates ) );
+    else
+    {
+        // Map key to ObjectMetadata.
+        m_map->insert( metadata.key, metadata );
+    }
+    return true;
 }
 
 }  // namespace sceneDB

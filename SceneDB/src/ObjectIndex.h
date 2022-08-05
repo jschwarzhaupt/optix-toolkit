@@ -30,11 +30,12 @@
 
 #include "ObjectMetadata.h"
 
+#include <cstdio>
 #include <memory>
 
 namespace sceneDB {
 
-/** ObjectMetadata is a map from Key to ObjectMetadata, providing the file offset and size of each object
+/** ObjectIndex is a map from Key to ObjectMetadata, providing the file offset and size of each object
     in an object store. */
 class ObjectIndex
 {
@@ -46,11 +47,21 @@ class ObjectIndex
     /// \param filename { File containing ObjectMetadata records. }
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for
     /// updates. }
-    static std::unique_ptr<ObjectIndex> read( const char* filename, bool pollForUpdates = false );
+    ObjectIndex( const char* filename, bool pollForUpdates );
+
+    /// Destroy ObjectIndex
+    ~ObjectIndex();
 
     /// Find ObjectMetadata for the specified key.  Returns true if found and returns the metadata
     /// via result parameter.
-    virtual bool find( Key key, ObjectMetadata* result ) const = 0;
+    bool find( Key key, ObjectMetadata* result ) const;
+
+  private:
+    std::unique_ptr<class ObjectMetadataMap> m_map;
+    FILE* m_file;
+
+    void readFile();
+    bool readRecord();
 };
 
 }  // namespace sceneDB
