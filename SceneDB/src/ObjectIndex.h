@@ -36,7 +36,7 @@ namespace sceneDB {
 
 /** ObjectMetadata is a map from Key to ObjectMetadata, providing the file offset and size of each object
     in an object store. */
-class ObjectMetadataMap
+class ObjectIndex
 {
   public:
     using Key = uint64_t;
@@ -46,7 +46,7 @@ class ObjectMetadataMap
     /// \param filename { File containing ObjectMetadata records. }
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for
     /// updates. }
-    static std::unique_ptr<ObjectMetadataMap> read( const char* filename, bool pollForUpdates = false );
+    static std::unique_ptr<ObjectIndex> read( const char* filename, bool pollForUpdates = false );
 
     /// Find ObjectMetadata for the specified key.  Returns true if found and returns the metadata
     /// via result parameter.

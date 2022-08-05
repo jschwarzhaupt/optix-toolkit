@@ -28,7 +28,7 @@
 
 #include "ObjectStoreReaderImpl.h"
 #include "ObjectFileReader.h"
-#include "ObjectMetadataMap.h"
+#include "ObjectIndex.h"
 #include "ObjectStoreImpl.h"
 
 #include <OptiXToolkit/Util/Exception.h>
@@ -50,7 +50,7 @@ ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore
 
     // Open the object data file and read the object metadata file.
     m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );
-    m_metadataMap = ObjectMetadataMap::read( objectStore.getIndexFile().string().c_str() );
+    m_metadataMap = ObjectIndex::read( objectStore.getIndexFile().string().c_str() );
 }
 
 ObjectStoreReaderImpl::~ObjectStoreReaderImpl()

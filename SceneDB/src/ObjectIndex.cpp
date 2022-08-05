@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectMetadataMap.h"
+#include "ObjectIndex.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -48,7 +48,7 @@ class ObjectMetadataReader
 
     ~ObjectMetadataReader() { fclose( m_file ); }
 
-    void read( std::unordered_map<ObjectMetadataMap::Key, ObjectMetadata>* map )
+    void read( std::unordered_map<ObjectIndex::Key, ObjectMetadata>* map )
     {
         // Read records (using buffered I/O), updating the map.  For now we stop
         // when EOF is encountered, rather than continuing to poll for updates.
@@ -60,7 +60,7 @@ class ObjectMetadataReader
   private:
     FILE* m_file;
 
-    bool readRecord( std::unordered_map<ObjectMetadataMap::Key, ObjectMetadata>* map )
+    bool readRecord( std::unordered_map<ObjectIndex::Key, ObjectMetadata>* map )
     {
         // Read one ObjectMetadata
         ObjectMetadata metadata;
@@ -87,10 +87,10 @@ class ObjectMetadataReader
     }
 };
 
-class ObjectMetadataMapImpl : public ObjectMetadataMap
+class ObjectIndexImpl : public ObjectIndex
 {
   public:
-    ObjectMetadataMapImpl( const char* filename, bool pollForUpdates )
+    ObjectIndexImpl( const char* filename, bool pollForUpdates )
     {
         OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
         ObjectMetadataReader( filename ).read( &m_map );
@@ -110,9 +110,9 @@ class ObjectMetadataMapImpl : public ObjectMetadataMap
     std::unordered_map<Key, ObjectMetadata> m_map;
 };
 
-std::unique_ptr<ObjectMetadataMap> ObjectMetadataMap::read( const char* filename, bool pollForUpdates )
+std::unique_ptr<ObjectIndex> ObjectIndex::read( const char* filename, bool pollForUpdates )
 {
-    return std::unique_ptr<ObjectMetadataMap>( new ObjectMetadataMapImpl( filename, pollForUpdates ) );
+    return std::unique_ptr<ObjectIndex>( new ObjectIndexImpl( filename, pollForUpdates ) );
 }
 
 }  // namespace sceneDB

@@ -64,7 +64,7 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
   private:
     Options                                  m_options;
     std::unique_ptr<class ObjectFileReader>  m_objects;
-    std::unique_ptr<class ObjectMetadataMap> m_metadataMap;
+    std::unique_ptr<class ObjectIndex> m_metadataMap;
 };
 
 }  // namespace sceneDB
