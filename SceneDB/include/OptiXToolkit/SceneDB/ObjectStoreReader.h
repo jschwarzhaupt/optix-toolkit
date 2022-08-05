@@ -42,7 +42,7 @@ class ObjectStoreReader
     struct Options
     {
         /// If true, a thread is spawned that polls the filesystem for updates.
-        bool pollForUpdates = false;
+        bool pollForUpdates = true;
 
         /// Equality operator for options.
         bool operator==( const Options& other ) const { return pollForUpdates == other.pollForUpdates; }

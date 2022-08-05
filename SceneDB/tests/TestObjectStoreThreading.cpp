@@ -82,7 +82,7 @@ class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
     }
 };
 
-TEST_P(TestObjectStoreThreading, TestThreadedWrite)
+TEST_P(TestObjectStoreThreading, TestThreading)
 {
     const TestParams& params = GetParam();
 
@@ -114,7 +114,9 @@ TEST_P(TestObjectStoreThreading, TestThreadedWrite)
 
     // Construct ObjectReaders, which reads the object metadata file.
     otk::Stopwatch metadataTimer;
-    ObjectReaders  readers( m_store, objectSizes, /*validateData=*/true, params.numThreads );
+    ObjectStoreReader::Options options;
+    options.pollForUpdates = false;
+    ObjectReaders readers( m_store, options, objectSizes, /*validateData=*/true, params.numThreads );
 
     // Print object metadata read stats.
     double metadataTime   = metadataTimer.elapsed();

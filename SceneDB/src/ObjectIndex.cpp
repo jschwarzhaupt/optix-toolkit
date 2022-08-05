@@ -32,6 +32,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <poll.h>
 #include <unordered_map>
 
 namespace sceneDB {
@@ -65,19 +66,19 @@ class LockingObjectMetadataMap : public ObjectMetadataMap
     virtual void erase( Key key )
     {
         std::unique_lock lock( m_mutex );
-        erase( key );
+        ObjectMetadataMap::erase( key );
     }
 
     virtual void insert( Key key, const ObjectMetadata& metadata )
     {
         std::unique_lock lock( m_mutex );
-        insert( key, metadata );
+        ObjectMetadataMap::insert( key, metadata );
     }
 
     virtual bool find( Key key, ObjectMetadata* result ) const
     {
         std::unique_lock lock( m_mutex );
-        return find( key, result );
+        return ObjectMetadataMap::find( key, result );
     }
 
   private:
@@ -89,15 +90,32 @@ ObjectIndex::ObjectIndex( const char* filename, bool pollForUpdates )
     : m_map( pollForUpdates ? new LockingObjectMetadataMap : new ObjectMetadataMap )
     , m_file( fopen( filename, "rb" ) )
 {
-    OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
     if( m_file == nullptr )
         throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+
+    // Read the metadata file, up to EOF.
     readFile();
+
+    // If polling is enabled, spawn a thread to continue reading metadata,
+    // using poll() to wait for updates.
+    if( pollForUpdates )
+    {
+        m_thread = std::thread( &ObjectIndex::reader, this );
+    }
+    else
+    {
+        close();
+    }
 }
 
 ObjectIndex::~ObjectIndex()
 {
-    fclose( m_file );
+    m_done = true;
+    if( m_thread.joinable() )
+    {
+        m_thread.join();
+    }
+    close();
 }
 
 bool ObjectIndex::find( Key key, ObjectMetadata* result ) const
@@ -105,15 +123,41 @@ bool ObjectIndex::find( Key key, ObjectMetadata* result ) const
     return m_map->find( key, result );
 }
 
+static void pollFile( int fd )
+{
+    ::pollfd pollfd{};
+    pollfd.fd = fd;
+    pollfd.events = POLLIN;
+    int status    = ::poll( &pollfd, 1, 500 /*msec*/ );
+    if( status < 0 )
+        throw otk::Exception( "Error polling object index file descriptor." );
+    OTK_ASSERT( !( pollfd.revents & POLLERR ) );
+    OTK_ASSERT( !( pollfd.revents & POLLNVAL ) );
+}
+
+
+// Read the object metadata file, blocking to poll when EOF is encountered.
+void ObjectIndex::reader()
+{
+    while( !m_done )
+    {
+        bool success = readRecord();
+        if( !success )
+        {
+            pollFile( ::fileno( m_file ) );
+        }
+    }
+}
+
+// Read the object metadata file until EOF is encountered.
 void ObjectIndex::readFile()
 {
-    // Read records (using buffered I/O), updating the map.  For now we stop
-    // when EOF is encountered, rather than continuing to poll for updates.
     while( readRecord() )
     {
     }
 }
 
+// Read an object metadata record (using buffered I/O), updating the map. 
 bool ObjectIndex::readRecord()
 {
     // Read one ObjectMetadata

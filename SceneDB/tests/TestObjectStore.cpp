@@ -30,6 +30,9 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <thread>
+
 using namespace sceneDB;
 
 class TestObjectStore : public testing::Test
@@ -67,7 +70,9 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     writer->insert( 2, str2, strlen( str2 ) );
     writer.reset();
 
-    auto reader = m_store->getReader();
+    ObjectStoreReader::Options options;
+    options.pollForUpdates = false;
+    auto reader = m_store->getReader( options );
 
     std::vector<char> buf1(strlen(str1)+1);
     size_t size1;
@@ -96,7 +101,9 @@ TEST_F(TestObjectStore, TestRemove)
     writer->remove( 2 );
     writer.reset();
 
-    auto reader = m_store->getReader();
+    ObjectStoreReader::Options options;
+    options.pollForUpdates = false;
+    auto reader = m_store->getReader( options );
 
     std::vector<char> buf1(strlen(str3)+1);
     size_t size1;
@@ -110,4 +117,50 @@ TEST_F(TestObjectStore, TestRemove)
     reader.reset();
     m_store->destroy();
 
+}
+
+TEST_F(TestObjectStore, DISABLED_TestReaderPolling)
+{
+    using namespace std::chrono_literals;
+
+    // Create writer.
+    auto writer = m_store->getWriter();
+
+    // Create reader with polling enabled.
+    ObjectStoreReader::Options options;
+    options.pollForUpdates = true;
+    auto reader = m_store->getReader( options );
+
+    // Write first object.
+    const char* str1 = "Hello, world!";
+    writer->insert( 1, str1, strlen( str1 ) );
+    writer->flush();
+
+    // Avoid racing with the reader while it asynchronously reads metadata.
+    std::this_thread::sleep_for( 100ms );
+
+    // Read first object.
+    std::vector<char> buf1(strlen(str1)+1);
+    size_t size1;
+    EXPECT_TRUE( reader->find( 1, buf1.data(), buf1.size(), size1 ) );
+    buf1[strlen( str1 )] = '\0';
+    EXPECT_STREQ( str1, buf1.data() );
+
+    // Write second object.
+    const char* str2 = "Goodbye, cruel world.";
+    writer->insert( 2, str2, strlen( str2 ) );
+    writer->flush();
+
+    // Avoid racing with the reader while it asynchronously reads metadata.
+    std::this_thread::sleep_for( 100ms );
+
+    // Read second object.
+    std::vector<char> buf2;
+    EXPECT_TRUE( reader->find( 2, buf2 ) );
+    EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
+
+    // Clean up.
+    writer.reset();
+    reader.reset();
+    m_store->destroy();
 }

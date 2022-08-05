@@ -40,10 +40,11 @@
 class ObjectReaders
 {
   public:
-    ObjectReaders( std::shared_ptr<sceneDB::ObjectStore> store,
-                   const std::vector<size_t>&   objectSizes,
-                   bool                         validateData,
-                   unsigned int                 numThreads = std::thread::hardware_concurrency() )
+    ObjectReaders( std::shared_ptr<sceneDB::ObjectStore>      store,
+                   const sceneDB::ObjectStoreReader::Options& options,
+                   const std::vector<size_t>&                 objectSizes,
+                   bool                                       validateData,
+                   unsigned int                               numThreads = std::thread::hardware_concurrency() )
         : m_store( store )
         , m_objectSizes( objectSizes )
         , m_validateData( validateData )
@@ -59,7 +60,7 @@ class ObjectReaders
         }
 
         // Create the ObjectStoreReader.
-        m_reader = m_store->getReader();
+        m_reader = m_store->getReader( options );
     }
 
     void read()

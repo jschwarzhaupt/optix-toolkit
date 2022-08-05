@@ -64,6 +64,7 @@ class ObjectStorePerfTest
         unsigned int numThreads;
         size_t       numObjects;
         size_t       objectSize;
+        bool         pollForUpdates;
     };
 
     void run( const Params& params )
@@ -75,23 +76,25 @@ class ObjectStorePerfTest
         std::vector<size_t> objectSizes( params.numObjects, params.objectSize );
 
         // Write the objects.  The writer is scoped to ensure that it's closed properly.
-        ObjectWriters  writers( store, objectSizes, params.numThreads );
+        std::unique_ptr<ObjectWriters> writers( new ObjectWriters( store, objectSizes, params.numThreads ) );
         otk::Stopwatch writeTimer;
-        writers.write();
+        writers->write();
         double writeTime   = writeTimer.elapsed();
+        writers.reset();
 
-        // Report writer stats.
-        float  writeSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
-        
         // Construct ObjectReaders, which reads the object metadata file.
         otk::Stopwatch metadataTimer;
-        ObjectReaders  readers( store, objectSizes, /*validateData=*/false, params.numThreads );
+        ObjectStoreReader::Options options;
+        options.pollForUpdates = false;
+        std::unique_ptr<ObjectReaders> readers(
+            new ObjectReaders( store, options, objectSizes, /*validateData=*/false, params.numThreads ) );
         double metadataTime   = metadataTimer.elapsed();
 
         // Read the objects, validating their contents.
         otk::Stopwatch dataTimer;
-        readers.read();
+        readers->read();
         double dataTime = dataTimer.elapsed();
+        readers.reset();
 
         // Print stats.
         float  objectsSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
@@ -112,13 +115,13 @@ class ObjectStorePerfTest
         unsigned int numThreads = 1;
         for( size_t size = 64; size <= 1024; size += 64 )
         {
-            // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, size} );
+            // Params: numThreads, numObjects, objectSize, pollForUpdates
+            run( Params{numThreads, 10000, size, false} );
         }
         for( size_t size = 512; size <= 16 * 1024; size += 512 )
         {
             // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, size} );
+            run( Params{numThreads, 10000, size, false} );
         }
     }
 
@@ -128,7 +131,7 @@ class ObjectStorePerfTest
         for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * m_maxThreads ); ++numThreads )
         {
             // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, 4 * 1024} );
+            run( Params{numThreads, 10000, 4 * 1024, false} );
         }
     }
 
@@ -138,7 +141,7 @@ class ObjectStorePerfTest
         for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * m_maxThreads ); ++numThreads )
         {
             // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, 12 * 1024} );
+            run( Params{numThreads, 10000, 12 * 1024, false} );
         }
     }
 };

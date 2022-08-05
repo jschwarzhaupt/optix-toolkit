@@ -30,8 +30,10 @@
 
 #include "ObjectMetadata.h"
 
+#include <atomic>
 #include <cstdio>
 #include <memory>
+#include <thread>
 
 namespace sceneDB {
 
@@ -42,14 +44,15 @@ class ObjectIndex
   public:
     using Key = uint64_t;
 
-    /// Read object metadata file, creating a map from key to ObjectMetaData.  Throws an exception if an
-    /// error occurs.  
+    /// Read object metadata file, creating a map from key to ObjectMetaData.  Throws an exception
+    /// if an error occurs.
     /// \param filename { File containing ObjectMetadata records. }
     /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for
     /// updates. }
     ObjectIndex( const char* filename, bool pollForUpdates );
 
-    /// Destroy ObjectIndex
+    /// Destroy ObjectIndex.  Might take up to POLL_TIMEOUT_MSEC to join with child thread if
+    /// polling for updates is enabled.
     ~ObjectIndex();
 
     /// Find ObjectMetadata for the specified key.  Returns true if found and returns the metadata
@@ -58,10 +61,23 @@ class ObjectIndex
 
   private:
     std::unique_ptr<class ObjectMetadataMap> m_map;
-    FILE* m_file;
+    FILE*                                    m_file;
+    std::thread                              m_thread;
+    std::atomic<bool>                        m_done            = false;
+    const static int                         POLL_TIMEOUT_MSEC = 500;
 
+    void reader();
     void readFile();
     bool readRecord();
+
+    void close()
+    {
+        if( m_file )
+        {
+            fclose( m_file );
+            m_file = nullptr;
+        }
+    }
 };
 
 }  // namespace sceneDB
