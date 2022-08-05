@@ -31,8 +31,8 @@
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <cstdint>
+#include <mutex>
 #include <unordered_map>
-
 
 namespace sceneDB {
 
@@ -57,6 +57,31 @@ class ObjectMetadataMap
 
   private:
     std::unordered_map<Key, ObjectMetadata> m_map;
+};
+
+class LockingObjectMetadataMap : public ObjectMetadataMap
+{
+  public:
+    virtual void erase( Key key )
+    {
+        std::unique_lock lock( m_mutex );
+        erase( key );
+    }
+
+    virtual void insert( Key key, const ObjectMetadata& metadata )
+    {
+        std::unique_lock lock( m_mutex );
+        insert( key, metadata );
+    }
+
+    virtual bool find( Key key, ObjectMetadata* result ) const
+    {
+        std::unique_lock lock( m_mutex );
+        return find( key, result );
+    }
+
+  private:
+    mutable std::mutex m_mutex;
 };
 
 class ObjectMetadataReader
@@ -114,15 +139,16 @@ class ObjectIndexImpl : public ObjectIndex
 {
   public:
     ObjectIndexImpl( const char* filename, bool pollForUpdates )
+        : m_map( pollForUpdates ? new LockingObjectMetadataMap : new ObjectMetadataMap )
     {
         OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
-        ObjectMetadataReader( filename ).read( &m_map );
+        ObjectMetadataReader( filename ).read( m_map.get() );
     }
 
-    bool find( Key key, ObjectMetadata* result ) const override { return m_map.find( key, result ); }
+    bool find( Key key, ObjectMetadata* result ) const override { return m_map->find( key, result ); }
 
   private:
-    ObjectMetadataMap m_map;
+    std::unique_ptr<ObjectMetadataMap> m_map;
 };
 
 std::unique_ptr<ObjectIndex> ObjectIndex::read( const char* filename, bool pollForUpdates )
