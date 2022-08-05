@@ -30,48 +30,73 @@
 
 #include <OptiXToolkit/Util/Exception.h>
 
+#include <cstdint>
+#include <unordered_map>
+
+
 namespace sceneDB {
 
-ObjectMetadataMap::ObjectMetadataMap( const char* filename, bool pollForUpdates )
+class ObjectMetadataMapImpl : public ObjectMetadataMap
 {
-    OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
-    readMetadata( filename );
-}
-
-void ObjectMetadataMap::readMetadata( const char* filename )
-{
-    // Open the object metadata file.
-    FILE* file = fopen( filename, "rb" );
-    if( file == nullptr )
-        throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
-
-    // Read records (using buffered I/O), updating the map.  For now we stop
-    // when EOF is encountered, rather than continuing to poll for updates.
-    ObjectMetadata metadata;
-    while (true)
+  public:
+    ObjectMetadataMapImpl( const char* filename, bool pollForUpdates )
     {
-        // Read one ObjectMetadata 
-        size_t itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, file );
-        if (itemsRead < 1)
+        OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
+        readMetadata( filename );
+    }
+
+    bool find( Key key, ObjectMetadata* result ) const override
+    {
+        auto it = m_map.find( key );
+        if( it == m_map.end() )
+            return false;
+
+        *result = it->second;
+        return true;
+    }
+
+  private:
+    std::unordered_map<Key, ObjectMetadata> m_map;
+
+    void readMetadata( const char* filename )
+    {
+        // Open the object metadata file.
+        FILE* file = fopen( filename, "rb" );
+        if( file == nullptr )
+            throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+
+        // Read records (using buffered I/O), updating the map.  For now we stop
+        // when EOF is encountered, rather than continuing to poll for updates.
+        ObjectMetadata metadata;
+        while( true )
         {
-            if (ferror(file))
-                throw otk::Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
+            // Read one ObjectMetadata
+            size_t itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, file );
+            if( itemsRead < 1 )
+            {
+                if( ferror( file ) )
+                    throw otk::Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
+                else
+                    return;  // EOF
+            }
+
+            // Special case: a sentinel offset value denotes object removal.
+            if( metadata.offset == ObjectMetadata::REMOVED )
+            {
+                m_map.erase( metadata.key );
+            }
             else
-                return; // EOF
-
-        }
-
-        // Special case: a sentinel offset value denotes object removal.
-        if (metadata.offset == ObjectMetadata::REMOVED)
-        {
-            m_map.erase( metadata.key );
-        }
-        else
-        {
-            // Map key to ObjectMetadata.
-            m_map[metadata.key] = metadata;
+            {
+                // Map key to ObjectMetadata.
+                m_map[metadata.key] = metadata;
+            }
         }
     }
+};
+
+std::unique_ptr<ObjectMetadataMap> ObjectMetadataMap::read( const char* filename, bool pollForUpdates )
+{
+    return std::unique_ptr<ObjectMetadataMap>( new ObjectMetadataMapImpl( filename, pollForUpdates ) );
 }
 
-} // namespace sceneDB
+}  // namespace sceneDB

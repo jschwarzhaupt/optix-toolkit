@@ -30,10 +30,7 @@
 
 #include "ObjectMetadata.h"
 
-#include <OptiXToolkit/Util/Exception.h>
-
-#include <cstdint>
-#include <unordered_map>
+#include <memory>
 
 namespace sceneDB {
 
@@ -44,29 +41,16 @@ class ObjectMetadataMap
   public:
     using Key = uint64_t;
 
-    /// Construct ObjectMetadata, reading records from the specified file.  Throws an exception if an
+    /// Read object metadata file, creating a map from key to ObjectMetaData.  Throws an exception if an
     /// error occurs.  
     /// \param filename { File containing ObjectMetadata records. }
-    /// \param pollForUpdates { If true, a thread is spawned that polls the
-    /// filesystem for updates. }
-    ObjectMetadataMap( const char* filename, bool pollForUpdates = false );
+    /// \param pollForUpdates { If true, a thread is spawned that polls the filesystem for
+    /// updates. }
+    static std::unique_ptr<ObjectMetadataMap> read( const char* filename, bool pollForUpdates = false );
 
     /// Find ObjectMetadata for the specified key.  Returns true if found and returns the metadata
     /// via result parameter.
-    bool find( Key key, ObjectMetadata* result ) const
-    {
-        auto it = m_map.find( key );
-        if( it == m_map.end() )
-            return false;
-
-        *result = it->second;
-        return true;
-    }
-
-  private:
-    std::unordered_map<Key, ObjectMetadata> m_map;
-
-    void readMetadata( const char* filename );
+    virtual bool find( Key key, ObjectMetadata* result ) const = 0;
 };
 
 }  // namespace sceneDB

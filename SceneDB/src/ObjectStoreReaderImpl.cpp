@@ -50,7 +50,7 @@ ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore
 
     // Open the object data file and read the object metadata file.
     m_objects.reset( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) );
-    m_metadata.reset( new ObjectMetadataMap( objectStore.getIndexFile().string().c_str() ) );
+    m_metadataMap = ObjectMetadataMap::read( objectStore.getIndexFile().string().c_str() );
 }
 
 ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
@@ -61,7 +61,7 @@ bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& 
 {
     // Look up the key in the object metadata map.
     ObjectMetadata metadata;
-    if( !m_metadata->find( key, &metadata ) )
+    if( !m_metadataMap->find( key, &metadata ) )
         return false;
 
     // Read the object using the offset and size from the object metadata.
@@ -75,7 +75,7 @@ bool ObjectStoreReaderImpl::find( Key key, std::vector<char>& dest )
 {
     // Look up the key in the object metadata map.
     ObjectMetadata metadata;
-    if( !m_metadata->find( key, &metadata ) )
+    if( !m_metadataMap->find( key, &metadata ) )
         return false;
 
     // Allocate storage for the object.
