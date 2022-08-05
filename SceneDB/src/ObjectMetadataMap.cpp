@@ -36,13 +36,64 @@
 
 namespace sceneDB {
 
+class ObjectMetadataReader
+{
+  public:
+    ObjectMetadataReader( const char* filename )
+        : m_file( fopen( filename, "rb" ) )
+    {
+        if( m_file == nullptr )
+            throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+    }
+
+    ~ObjectMetadataReader() { fclose( m_file ); }
+
+    void read( std::unordered_map<ObjectMetadataMap::Key, ObjectMetadata>* map )
+    {
+        // Read records (using buffered I/O), updating the map.  For now we stop
+        // when EOF is encountered, rather than continuing to poll for updates.
+        while( readRecord( map ) )
+        {
+        }
+    }
+
+  private:
+    FILE* m_file;
+
+    bool readRecord( std::unordered_map<ObjectMetadataMap::Key, ObjectMetadata>* map )
+    {
+        // Read one ObjectMetadata
+        ObjectMetadata metadata;
+        size_t         itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, m_file );
+        if( itemsRead < 1 )
+        {
+            if( ferror( m_file ) )
+                throw otk::Exception( "Error reading object metadata file" );
+            else
+                return false;  // EOF
+        }
+
+        // Special case: a sentinel offset value denotes object removal.
+        if( metadata.offset == ObjectMetadata::REMOVED )
+        {
+            map->erase( metadata.key );
+        }
+        else
+        {
+            // Map key to ObjectMetadata.
+            (*map)[metadata.key] = metadata;
+        }
+        return true;
+    }
+};
+
 class ObjectMetadataMapImpl : public ObjectMetadataMap
 {
   public:
     ObjectMetadataMapImpl( const char* filename, bool pollForUpdates )
     {
         OTK_ASSERT_MSG( !pollForUpdates, "ObjectMetadata polling is TBD" );
-        readMetadata( filename );
+        ObjectMetadataReader( filename ).read( &m_map );
     }
 
     bool find( Key key, ObjectMetadata* result ) const override
@@ -57,41 +108,6 @@ class ObjectMetadataMapImpl : public ObjectMetadataMap
 
   private:
     std::unordered_map<Key, ObjectMetadata> m_map;
-
-    void readMetadata( const char* filename )
-    {
-        // Open the object metadata file.
-        FILE* file = fopen( filename, "rb" );
-        if( file == nullptr )
-            throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
-
-        // Read records (using buffered I/O), updating the map.  For now we stop
-        // when EOF is encountered, rather than continuing to poll for updates.
-        ObjectMetadata metadata;
-        while( true )
-        {
-            // Read one ObjectMetadata
-            size_t itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, file );
-            if( itemsRead < 1 )
-            {
-                if( ferror( file ) )
-                    throw otk::Exception( ( std::string( "Error reading object metadata file: " ) + filename ).c_str() );
-                else
-                    return;  // EOF
-            }
-
-            // Special case: a sentinel offset value denotes object removal.
-            if( metadata.offset == ObjectMetadata::REMOVED )
-            {
-                m_map.erase( metadata.key );
-            }
-            else
-            {
-                // Map key to ObjectMetadata.
-                m_map[metadata.key] = metadata;
-            }
-        }
-    }
 };
 
 std::unique_ptr<ObjectMetadataMap> ObjectMetadataMap::read( const char* filename, bool pollForUpdates )
