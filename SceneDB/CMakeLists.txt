@@ -40,15 +40,14 @@ include(../CMake/BuildConfig.cmake)
 
 add_library(SceneDB SHARED
   src/AppendOnlyFile.cpp
-  src/AppendOnlyFile.h
   src/ObjectFileReader.cpp
   src/ObjectIndex.cpp
   src/ObjectStoreImpl.cpp
-  src/ObjectStoreImpl.h
   src/ObjectStoreReaderImpl.cpp
-  src/ObjectStoreReaderImpl.h
   src/ObjectStoreWriterImpl.cpp
-  src/ObjectStoreWriterImpl.h
+  src/TableImpl.cpp
+  src/TableReaderImpl.cpp
+  src/TableWriterImpl.cpp
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -64,12 +63,19 @@ target_sources(SceneDB
   include/OptiXToolkit/SceneDB/ObjectStore.h
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h
   include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
+  include/OptiXToolkit/SceneDB/Table.h
+  include/OptiXToolkit/SceneDB/TableReader.h
+  include/OptiXToolkit/SceneDB/TableWriter.h
   )
 
 source_group( "Header Files\\Implementation" FILES
-  src/ObjectFileReader.h
-  src/ObjectIndex.h
-  src/ObjectMetadata.h
+  src/AppendOnlyFile.h
+  src/ObjectStoreImpl.h
+  src/ObjectStoreReaderImpl.h
+  src/ObjectStoreWriterImpl.h
+  src/TableImpl.h
+  src/TableReaderImpl.h
+  src/TableWriterImpl.h
   )
 
 target_include_directories(SceneDB PUBLIC
