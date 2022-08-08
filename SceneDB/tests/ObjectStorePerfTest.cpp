@@ -46,8 +46,9 @@ class ObjectStorePerfTest
         : m_statsFile( fopen( statsFilename, "w" ) )
     {
         OTK_ASSERT_MSG( m_statsFile != nullptr, "Error opening stats file" );
-        fprintf( m_statsFile, "num threads,object size,write throughput,read throughput,metadata throughput\n" );
+        fprintf( m_statsFile, "num threads,num objects,object size,write throughput,read throughput,metadata throughput\n" );
         printf( "Writing \"%s\" ", statsFilename );
+        fflush(stdout);
     }
 
     ~ObjectStorePerfTest()
@@ -72,7 +73,7 @@ class ObjectStorePerfTest
     void run( const Params& params )
     {
         // Create ObjectStore
-        std::shared_ptr<ObjectStore> store( ObjectStore::getInstance( ObjectStore::Options{"_testObjectStorePerf"} ) );
+        std::shared_ptr<ObjectStore> store( ObjectStore::createInstance( ObjectStore::Options{"_testObjectStorePerf"} ) );
 
         // Create vector of object sizes.
         std::vector<size_t> objectSizes( params.numObjects, params.objectSize );
@@ -111,8 +112,9 @@ class ObjectStorePerfTest
         // Print stats.
         float  objectsSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
         float  metadataSizeMB = objectSizes.size() * sizeof( sceneDB::ObjectMetadata ) / ( 1024 * 1024.f );
-        fprintf( m_statsFile, "%i,%zu,%g,%g,%g\n", params.numThreads, objectSizes[0], objectsSizeMB / writeTime,
-                 objectsSizeMB / dataTime, metadataSizeMB / metadataTime );
+        fprintf( m_statsFile, "%i,%zu,%zu,%g,%g,%g\n", params.numThreads, objectSizes.size(), objectSizes[0],
+                 objectsSizeMB / writeTime, objectsSizeMB / dataTime, metadataSizeMB / metadataTime );
+        fflush( m_statsFile );
         fputc('.', stdout);
         fflush(stdout);
 
@@ -156,6 +158,17 @@ class ObjectStorePerfTest
             run( Params{numThreads, 100000, 12 * 1024, false, false} );
         }
     }
+
+    // Test filesystem cache exhaustion.
+    void testFilesystemCache()
+        {
+            const unsigned int MILLION = 1000000;
+            for (unsigned int numObjects = 5 * MILLION; numObjects <= 100 * MILLION; numObjects += 5 * MILLION)
+            {
+                // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+                run( Params{12, numObjects, 4 * 1024, false, false} );
+            }
+        }
 };
 
 int main()
@@ -163,5 +176,6 @@ int main()
     ObjectStorePerfTest("object size.csv").testObjectSize();
     ObjectStorePerfTest("threading with 4K objects.csv").testThreads4K();
     ObjectStorePerfTest("threading with 12K objects.csv").testThreads12K();
+    ObjectStorePerfTest("filesystem cache.csv").testFilesystemCache();
     return 0;
 }

@@ -36,7 +36,7 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-std::shared_ptr<ObjectStore> ObjectStore::getInstance( const Options& options )
+std::shared_ptr<ObjectStore> ObjectStore::createInstance( const Options& options )
 {
     return std::shared_ptr<ObjectStore>( new ObjectStoreImpl( options ) );
 }

@@ -79,7 +79,7 @@ off_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
     off_t begin = m_offset.fetch_add( size );
 
     // Write the object at the reserved offset, using pwritev() to concatenate the given data blocks.
-    ssize_t bytesWritten = pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( dataBlocks ), numDataBlocks, begin );
+    ssize_t bytesWritten = ::pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( dataBlocks ), numDataBlocks, begin );
     if( bytesWritten != size )
         throw otk::Exception( "Error writing data to AppendOnlyFile" );
 

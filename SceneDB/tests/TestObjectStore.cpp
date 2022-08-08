@@ -40,7 +40,7 @@ class TestObjectStore : public testing::Test
 public:
     std::shared_ptr<ObjectStore> m_store;
 
-    void SetUp() { m_store = ObjectStore::getInstance( ObjectStore::Options{"_store"} ); }
+    void SetUp() { m_store = ObjectStore::createInstance( ObjectStore::Options{"_store"} ); }
 };
 
 TEST_F(TestObjectStore, TestCreateDestroy)

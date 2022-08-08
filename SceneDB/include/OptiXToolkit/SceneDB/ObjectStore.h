@@ -52,7 +52,7 @@ class ObjectStore
     
     /// Get an ObjectStore instance with the specified options.  An object store can only be written
     /// by one instance, which can be shared by multiple threads.
-    static std::shared_ptr<ObjectStore> getInstance( const Options& options = Options() );
+    static std::shared_ptr<ObjectStore> createInstance( const Options& options = Options() );
 
     /// Close an ObjectStore.  The contents of the object store persist until it is destroyed (via
     /// the destroy method).

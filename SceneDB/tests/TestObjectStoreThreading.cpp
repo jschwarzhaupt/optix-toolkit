@@ -58,7 +58,7 @@ class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
 
     void SetUp()
     {
-        m_store = ObjectStore::getInstance( ObjectStore::Options{ "_testObjectStoreThreading" } );
+        m_store = ObjectStore::createInstance( ObjectStore::Options{ "_testObjectStoreThreading" } );
     }
 
     void TearDown()

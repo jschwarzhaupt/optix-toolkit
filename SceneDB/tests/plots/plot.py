@@ -33,7 +33,23 @@ def plotThreadingWith4KObjects():
     outfile = os.path.splitext(filename)[0] + '.png'
     plt.savefig(outfile)
     plt.show()
-    
+
+def plotFilesystemCache():
+    filename = 'filesystem cache.csv'
+    df = pd.DataFrame()
+    df = pd.read_csv(filename)
+    fig, ax = plt.subplots()
+    ax.set_title('Read throughput vs. num 4K objects\n(warm cache)')
+    ax.set_xlabel('objects (M)')
+    ax.set_ylabel('Throughput (MB/s)')
+    ax.plot(df['num objects'] / 1000000, df['read throughput'], 'g.-')
+    # ax.set_xlim(xmin=1000000)
+    ax.set_ylim(ymin=0)
+    outfile = os.path.splitext(filename)[0] + '.png'
+    plt.savefig(outfile)
+    plt.show()
+
 if __name__ == '__main__':
     plotObjectSize()
     plotThreadingWith4KObjects()
+    plotFilesystemCache()
