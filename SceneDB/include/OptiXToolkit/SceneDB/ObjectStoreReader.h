@@ -52,7 +52,7 @@ class ObjectStoreReader
     using Key = uint64_t;
 
     /// Destroy ObjectStoreReader, releasing any associated resources.
-    virtual ~ObjectStoreReader();
+    virtual ~ObjectStoreReader() = default;
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer and returning the object size via result parameter.  Throws an exception

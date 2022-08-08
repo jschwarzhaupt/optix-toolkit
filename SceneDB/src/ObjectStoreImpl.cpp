@@ -41,18 +41,10 @@ std::shared_ptr<ObjectStore> ObjectStore::createInstance( const Options& options
     return std::shared_ptr<ObjectStore>( new ObjectStoreImpl( options ) );
 }
 
-ObjectStore::~ObjectStore()
-{
-}
-
 ObjectStoreImpl::ObjectStoreImpl( const Options& options )
     : m_options( options )
     , m_dataFile( path( m_options.directory ) / "objects.dat" )
     , m_indexFile( path( m_options.directory ) / "index.dat" )
-{
-}
-
-ObjectStoreImpl::~ObjectStoreImpl()
 {
 }
 

@@ -39,10 +39,6 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-ObjectStoreWriter::~ObjectStoreWriter()
-{
-}
-
 ObjectStoreWriterImpl::ObjectStoreWriterImpl( const ObjectStoreImpl& objectStore, const Options& options )
     : m_options( options )
 {

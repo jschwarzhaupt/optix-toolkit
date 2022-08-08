@@ -39,10 +39,6 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-ObjectStoreReader::~ObjectStoreReader()
-{
-}
-
 ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore, const Options& options )
     : m_options( options )
     , m_objects( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) )

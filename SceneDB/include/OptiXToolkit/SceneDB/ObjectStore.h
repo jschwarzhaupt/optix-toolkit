@@ -56,7 +56,7 @@ class ObjectStore
 
     /// Close an ObjectStore.  The contents of the object store persist until it is destroyed (via
     /// the destroy method).
-    virtual ~ObjectStore();
+    virtual ~ObjectStore() = default;
 
     /// Get an ObjectStoreWriter that can be used to insert objects in the store.  The object store
     /// is initialized when a writer is first created, destroying any previous contents.  Subsequent
@@ -65,7 +65,7 @@ class ObjectStore
     /// occurs.
     virtual std::shared_ptr<ObjectStoreWriter> getWriter( const ObjectStoreWriter::Options& options = ObjectStoreWriter::Options() ) = 0;
 
-    /// Get an an ObjectStoreReader that can be used to read objects from the store.  The object
+    /// Get an ObjectStoreReader that can be used to read objects from the store.  The object
     /// store is opened for reading when the first reader with a given set of options is requested.
     /// Subsequent calls returns the same reader, which can be used concurrently by multiple
     /// threads.  getReader() should not be called before getWriter(), since creating a writer might

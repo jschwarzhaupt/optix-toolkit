@@ -44,12 +44,12 @@ namespace sceneDB {
 class ObjectStoreImpl : public ObjectStore
 {
   public:
-    /// Construct an ObjectStoreImpl.  No I/O is performed until create() or read() is called.
+    /// Construct an ObjectStoreImpl.  No I/O is performed until getWriter() or getReader() is called.
     ObjectStoreImpl( const Options& options );
 
     /// Close an ObjectStoreImpl.  The contents of the object store persist until it is destroyed
     /// (via the destroy method).
-    virtual ~ObjectStoreImpl();
+    virtual ~ObjectStoreImpl() = default;
 
     /// Get an ObjectStoreWriter that can be used to insert objects in the store.  The object store
     /// is initialized when a writer is first created, destroying any previous contents.  Subsequent

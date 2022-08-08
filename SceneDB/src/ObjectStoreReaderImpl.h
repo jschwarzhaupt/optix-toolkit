@@ -58,7 +58,7 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
   protected:
     friend class ObjectStoreImpl;
 
-    /// Use ObjectStore::read() to obtain an ObjectStoreReader.
+    /// Use ObjectStore::getReader() to obtain an ObjectStoreReader.
     ObjectStoreReaderImpl( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:

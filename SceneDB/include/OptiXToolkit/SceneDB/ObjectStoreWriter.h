@@ -62,8 +62,14 @@ class ObjectStoreWriter
     using Key = uint64_t;
 
     /// Destroy ObjectStoreWriter, releasing any associated resources.
-    virtual ~ObjectStoreWriter();
+    virtual ~ObjectStoreWriter() = default;
     
+    /// Insert an object with the specified key. Thread safe. When the ObjectStore has deduplication
+    /// enabled, the insert call has no effect (returning false) if an object with the same key was
+    /// previously inserted (i.e. the key is a content-based address).  Throws an exception if an
+    /// error occurs.
+    virtual bool insert( Key key, const void* data, size_t size ) = 0;
+
     /// Insert an object with the specified key, concatenating the object data from multiple data
     /// blocks, each of which specifies a data pointer and size.  Thread safe.  When the ObjectStore
     /// has deduplication enabled, the insert call has no effect (returning false) if an object with
@@ -71,18 +77,12 @@ class ObjectStoreWriter
     /// exception if an error occurs.
     virtual bool insertV( Key key, const DataBlock* dataBlocks, int numDataBlocks ) = 0;
 
-    /// Insert an object with the specified key. Thread safe. When the ObjectStore has deduplication
-    /// enabled, the insert call has no effect (returning false) if an object with the same key was
-    /// previously inserted (i.e. the key is a content-based address).  Throws an exception if an
-    /// error occurs.
-    virtual bool insert( Key key, const void* data, size_t size ) = 0;
-
     /// Remove any object with the specified key. Thread safe. Throws an exception if an error
     /// occurs.
     virtual void remove( Key key ) = 0;
 
-    /// Flush any buffered data from previous operations to disk.  Uses fdatasync/_commit to flush
-    /// OS buffers as well.  Data from any concurrent operations is not guaranteed to be flushed.
+    /// Flush any buffered data from previous operations to disk.  Data from any concurrent
+    /// operations is not guaranteed to be flushed.
     virtual void flush() = 0;
 };
 
