@@ -33,8 +33,9 @@
 #include <OptiXToolkit/Util/Exception.h>
 #include <OptiXToolkit/Util/Stopwatch.h>
 
-#include <numeric>
 #include <cstdio>
+#include <fcntl.h>
+#include <numeric>
 
 using namespace sceneDB;
 
@@ -45,7 +46,7 @@ class ObjectStorePerfTest
         : m_statsFile( fopen( statsFilename, "w" ) )
     {
         OTK_ASSERT_MSG( m_statsFile != nullptr, "Error opening stats file" );
-        fprintf( m_statsFile, "# threads\tobject size\twrite throughput (MB/s)\tread throughput (MB/s)\tmetadata throughput (MB/s)\n" );
+        fprintf( m_statsFile, "num threads,object size,write throughput,read throughput,metadata throughput\n" );
         printf( "Writing \"%s\" ", statsFilename );
     }
 
@@ -65,6 +66,7 @@ class ObjectStorePerfTest
         size_t       numObjects;
         size_t       objectSize;
         bool         pollForUpdates;
+        bool         dropCaches;
     };
 
     void run( const Params& params )
@@ -82,6 +84,16 @@ class ObjectStorePerfTest
         double writeTime   = writeTimer.elapsed();
         writers.reset();
 
+        // Optionally drop caches (requires root permission).
+        if( params.dropCaches )
+        {
+            int fd = open( "/proc/sys/vm/drop_caches", O_WRONLY );
+            OTK_ASSERT_MSG( fd != -1, "Must run as root to drop caches" );
+            ssize_t bytesWritten = write( fd, "3", 1 );
+            OTK_ASSERT_MSG( bytesWritten == 1, "Write to drop_caches failed" );
+            close( fd );
+        }
+
         // Construct ObjectReaders, which reads the object metadata file.
         otk::Stopwatch metadataTimer;
         ObjectStoreReader::Options options;
@@ -90,7 +102,7 @@ class ObjectStorePerfTest
             new ObjectReaders( store, options, objectSizes, /*validateData=*/false, params.numThreads ) );
         double metadataTime   = metadataTimer.elapsed();
 
-        // Read the objects, validating their contents.
+        // Read the objects
         otk::Stopwatch dataTimer;
         readers->read();
         double dataTime = dataTimer.elapsed();
@@ -99,7 +111,7 @@ class ObjectStorePerfTest
         // Print stats.
         float  objectsSizeMB = std::accumulate( objectSizes.begin(), objectSizes.end(), 0UL ) / ( 1024 * 1024.f );
         float  metadataSizeMB = objectSizes.size() * sizeof( sceneDB::ObjectMetadata ) / ( 1024 * 1024.f );
-        fprintf( m_statsFile, "%i\t%zu\t%g\t%g\t%g\n", params.numThreads, objectSizes[0], objectsSizeMB / writeTime,
+        fprintf( m_statsFile, "%i,%zu,%g,%g,%g\n", params.numThreads, objectSizes[0], objectsSizeMB / writeTime,
                  objectsSizeMB / dataTime, metadataSizeMB / metadataTime );
         fputc('.', stdout);
         fflush(stdout);
@@ -113,15 +125,15 @@ class ObjectStorePerfTest
     void testObjectSize()
     {
         unsigned int numThreads = 1;
-        for( size_t size = 64; size <= 1024; size += 64 )
+        for( size_t size = 128; size < 1024; size += 128 )
         {
-            // Params: numThreads, numObjects, objectSize, pollForUpdates
-            run( Params{numThreads, 10000, size, false} );
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{numThreads, 100000, size, false, false} );
         }
-        for( size_t size = 512; size <= 16 * 1024; size += 512 )
+        for( size_t size = 1024; size <= 16 * 1024; size += 512 )
         {
             // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, size, false} );
+            run( Params{numThreads, 100000, size, false, false} );
         }
     }
 
@@ -130,8 +142,8 @@ class ObjectStorePerfTest
     {
         for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * m_maxThreads ); ++numThreads )
         {
-            // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, 4 * 1024, false} );
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{numThreads, 100000, 4 * 1024, false, false} );
         }
     }
 
@@ -140,8 +152,8 @@ class ObjectStorePerfTest
     {
         for( unsigned int numThreads = 1; numThreads <= static_cast<unsigned int>( 1.5f * m_maxThreads ); ++numThreads )
         {
-            // Params: numThreads, numObjects, objectSize
-            run( Params{numThreads, 10000, 12 * 1024, false} );
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{numThreads, 100000, 12 * 1024, false, false} );
         }
     }
 };
