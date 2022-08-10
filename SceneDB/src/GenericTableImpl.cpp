@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "TableImpl.h"
+#include "GenericTableImpl.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -36,28 +36,27 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-std::shared_ptr<Table> Table::createInstance( const char* directory, const char* tableName, size_t keySize, size_t recordSize )
+std::shared_ptr<GenericTable> GenericTable::createInstance( const char* directory, const char* tableName, size_t keySize, size_t recordSize, size_t recordAlignment )
 {
-    return std::shared_ptr<Table>( new TableImpl( directory, tableName, keySize, recordSize ) );
+    return std::shared_ptr<GenericTable>( new GenericTableImpl( directory, tableName, keySize, recordSize, recordAlignment ) );
 }
 
-TableImpl::TableImpl( const char* directory, const char* tableName, size_t keySize, size_t recordSize )
+GenericTableImpl::GenericTableImpl( const char* directory, const char* tableName, size_t keySize, size_t recordSize, size_t recordAlignment )
     : m_tableName( tableName )
     , m_directory( directory )
     , m_dataFile( path( directory ) / path( tableName ).replace_extension( "dat" ) )
-    , m_indexFile( path( directory ) / path( tableName ).replace_extension( "ind" ) )
 {
 }
 
-bool TableImpl::exists() const
+bool GenericTableImpl::exists() const
 {
-    return std::filesystem::exists( m_dataFile ) && std::filesystem::exists( m_indexFile );
+    return std::filesystem::exists( m_dataFile );
 }
 
-std::shared_ptr<TableWriter> TableImpl::getWriter()
+std::shared_ptr<GenericTableWriter> GenericTableImpl::getWriter()
 {
     std::unique_lock<std::mutex> lock( m_mutex );
-    OTK_ASSERT_MSG( !m_reader, "Table::getReader should not be called before getWriter" );
+    OTK_ASSERT_MSG( !m_reader, "GenericTable::getReader should not be called before getWriter" );
     
     // Subsequent calls return the same writer, provided the options match.
     if( !m_writer )
@@ -66,31 +65,31 @@ std::shared_ptr<TableWriter> TableImpl::getWriter()
         std::filesystem::create_directory( path( m_directory ) );
 
         // Create a new writer.
-        m_writer.reset( new TableWriterImpl( *this ) );
+        m_writer.reset( new GenericTableWriterImpl( *this ) );
     }
 
     return m_writer;
 }
 
-std::shared_ptr<TableReader> TableImpl::getReader()
+std::shared_ptr<GenericTableReader> GenericTableImpl::getReader()
 {
     std::unique_lock<std::mutex> lock( m_mutex );
     if( !m_reader )
     {
         // Create a new reader.
-        m_reader.reset( new TableReaderImpl( *this ) );
+        m_reader.reset( new GenericTableReaderImpl( *this ) );
     }
     return m_reader;
 }
 
-void TableImpl::close()
+void GenericTableImpl::close()
 {
     std::unique_lock<std::mutex> lock( m_mutex );
     m_writer.reset();
     m_reader.reset();
 }
 
-void TableImpl::destroy()
+void GenericTableImpl::destroy()
 {
     close();
     // TODO: allow object store and multiple tables to coexist in the same directory.

@@ -30,44 +30,47 @@
 
 #include <OptiXToolkit/SceneDB/GenericTableWriter.h>
 
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <unordered_set>
+#include <string>
+#include <vector>
+
 namespace sceneDB {
 
-/** TableWriter is a templated wrapper for GenericTableWriter.  It is used to insert fixed-sized
-    records into a Table, associating them with keys of arbitrary (fixed) size.  */
-template <typename Key, class Record>
-class TableWriter
+/** TableWriter is used to insert fixed-sized records into a Table, associating them with keys of
+    arbitrary (fixed) size. */
+class GenericTableWriterImpl : public GenericTableWriter
 {
   public:
-    /// Destroy writer, releasing any associated resources.
-    ~TableWriter() = default;
-
+    /// Destroy GenericTableWriter, closing any associated files.
+    ~GenericTableWriterImpl() override;
+    
     /// Insert a record with the specified key. Thread safe. Throws an exception if an error occurs.
-    bool insert( const Key& key, const Record& record ) { return m_writer->insert( &key, &record ); }
+    bool insert( KeyPtr key, RecordPtr record ) override;
 
     /// Update the record with the specified key, copying the given data to the specified offset in
     /// the record. Thread safe.  Throws an exception if an error occurs.
-    bool update( const Key& key, void* data, size_t size, size_t offset )
-    {
-        return m_writer->update( &key, data, size, offset );
-    }
+    bool update( KeyPtr key, void* data, size_t size, size_t offset ) override;
 
     /// Perform muliple record updates, copying each DataBlock to the corresponding offset in the
     /// record.  Thread safe.  Throws an exception if an error occurs.
-    bool updateV( const Key key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
-    {
-        return m_writer->updateV( key, dataBlocks, offsets, numDataBlocks );
-    }
+    bool updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks ) override;
 
     /// Remove record with the specified key, if any. Thread safe. Throws an exception if an error
     /// occurs.
-    void remove( Key key ) { m_writer->remove( &key ); }
+    void remove( KeyPtr key ) override;
 
     /// Flush any buffered data from previous operations to disk.  Data from any concurrent
     /// operations is not guaranteed to be flushed.
-    void flush() { m_writer->flush(); }
+    void flush() override;
 
-  private:
-    std::unique_ptr<GenericTableWriter> m_writer;
+  protected:
+    friend class GenericTableImpl;
+
+    /// Use Table::getWriter() to obtain a GenericTableWriter.
+    GenericTableWriterImpl( const class GenericTableImpl& table );
 };
 
 }  // namespace sceneDB

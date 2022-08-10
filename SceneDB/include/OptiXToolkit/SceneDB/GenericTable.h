@@ -25,75 +25,52 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-
 #pragma once
 
-#include "TableReaderImpl.h"
-#include "TableWriterImpl.h"
-
-#include <OptiXToolkit/SceneDB/Table.h>
-
 #include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <mutex>
 
 namespace sceneDB {
 
-/** TableImpl implements the abstract Table base class. */
-class TableImpl : public Table
+/** A GenericTable stores fixed-sized objects, each with an associated key.  Arbitrary (fixed) sized
+    keys are supported.  Once created, a table persists until it is destroyed or recreated. */
+class GenericTable
 {
   public:
-    /// Get an instance of Table with the given name in the specified directory.
-    /// No I/O is performed until getWriter() or getReader() is called.
-    TableImpl( const char* directory, const char* tableName, size_t keySize, size_t recordSize );
+    /// Get an instance of GenericTable with the given name in the specified directory.
+    static std::shared_ptr<GenericTable> createInstance( const char* directory,
+                                                         const char* tableName,
+                                                         size_t      keySize,
+                                                         size_t      recordSize,
+                                                         size_t      recordAlignment );
 
-    /// Close an TableImpl.  The contents of the table persist until it is destroyed (via the
-    /// destroy method).
-    virtual ~TableImpl() = default;
+    /// Close a Table.  The contents of the table persist until it is destroyed via the destroy() method.
+    virtual ~GenericTable() = default;
 
     /// Get a TableWriter that can be used to insert records in the store.  The Table is initialized
     /// when a writer is first created, destroying any previous contents.  Subsequent calls return
     /// the same writer.  The writer can be used concurrently by multiple threads. Throws an
     /// exception if an error occurs.
-    std::shared_ptr<TableWriter> getWriter() override;
+    virtual std::shared_ptr<GenericTableWriter> getWriter() = 0;
 
     /// Get a TableReader that can be used to read records from the table.  The table is opened for
     /// reading when the first reader is requested.  Subsequent calls returns the same reader, which
     /// can be used concurrently by multiple threads.  getReader() should not be called before
     /// getWriter(), since creating a writer might reinitialize the table, which invalidates any
     /// readers.  Throws an exception if an error occurs.
-    std::shared_ptr<TableReader> getReader() override;
+    virtual std::shared_ptr<GenericTableReader> getReader() = 0;
 
     /// Get the table name.
-    const std::string& getTableName() const override { return m_tableName; }
+    virtual const std::string& getTableName() const = 0;
 
-    /// Check whether the table has been initialized via getWriter().
-    bool exists() const override;
+    /// Check whether the object store has been initialized via getWriter().
+    virtual bool exists() const = 0;
 
     /// Close the table, releasing any reader and writer instances.
-    void close() override;
+    virtual void close() = 0;
 
-    /// Destroy the table, closing it if necessary and removing any associated disk files.
-    /// Any previously created writers or readers should be destroyed before calling destroy().
-    void destroy() override;
-
-  protected:
-    friend class TableReaderImpl;
-    friend class TableWriterImpl;
-
-    const std::filesystem::path& getDataFile() const { return m_dataFile; }
-    const std::filesystem::path& getIndexFile() const { return m_indexFile; }
-
-  private:
-    const std::string           m_tableName;
-    const std::filesystem::path m_directory;
-    const std::filesystem::path m_dataFile;
-    const std::filesystem::path m_indexFile;
-
-    std::mutex m_mutex;
-    std::shared_ptr<TableWriterImpl> m_writer;
-    std::shared_ptr<TableReaderImpl> m_reader;
+    /// Destroy the table, removing any associated disk files.  Any previously created writers or
+    /// readers should be destroyed before calling destroy().
+    virtual void destroy() = 0;
 };
 
-}  // namespace sceneDB
+} // namespace sceneDB

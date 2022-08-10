@@ -26,31 +26,34 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "TableReaderImpl.h"
-#include "TableImpl.h"
+#pragma once
 
-#include <OptiXToolkit/Util/Exception.h>
-
-#include <filesystem>
-
-using path = std::filesystem::path;
+#include <cstdint>
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace sceneDB {
 
-TableReaderImpl::TableReaderImpl( const TableImpl& table )
+/** GenericTableReader is a thread-safe reader for a GenericTable. */
+class GenericTableReader
 {
-}
+  public:
+    /// Generic key pointer type.
+    using KeyPtr = const void*;
 
-size_t TableReaderImpl::getRecordSize()
-{
-    // XXX TODO
-    return 0;
-}
+    /// Generic record pointer type.
+    using RecordPtr = const void*;
+    
+    /// Destroy reader, releasing any associated resources.
+    virtual ~GenericTableReader() = default;
 
-bool TableReaderImpl::find( KeyPtr key, RecordPtr record )
-{
-    // XXX TODO
-    return false;
-}
+    /// Get the record size.
+    virtual size_t getRecordSize() = 0;
+        
+    /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
+    /// Thread safe.  TODO: describe snapshot lifetime guarantee.
+    virtual RecordPtr find( KeyPtr key ) = 0;
+};
 
 }  // namespace sceneDB

@@ -25,59 +25,73 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
+
 #pragma once
+
+#include "GenericTableReaderImpl.h"
+#include "GenericTableWriterImpl.h"
 
 #include <OptiXToolkit/SceneDB/GenericTable.h>
 
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+
 namespace sceneDB {
 
-/** Table is a templated wrapper for GenericTable. */
-template <typename Key, class Record>
-class Table
+/** GenericTableImpl implements the abstract GenericTable base class. */
+class GenericTableImpl : public GenericTable
 {
   public:
     /// Get an instance of Table with the given name in the specified directory.
-    static std::shared_ptr<Table> createInstance( const char* directory, const char* tableName )
-    {
-        return new Table( GenericTable::createInstance( directory, tableName, sizeof( Key ), sizeof( Record ), alignof( Record ) ) );
-    }
+    /// No I/O is performed until getWriter() or getReader() is called.
+    GenericTableImpl( const char* directory, const char* tableName, size_t keySize, size_t recordSize, size_t recordAlignment );
 
-    /// Close a Table.  The contents of the table persist until it is destroyed via the destroy() method.
-    ~Table() = default;
+    /// Close an GenericTableImpl.  The contents of the table persist until it is destroyed (via the
+    /// destroy method).
+    virtual ~GenericTableImpl() = default;
 
     /// Get a TableWriter that can be used to insert records in the store.  The Table is initialized
     /// when a writer is first created, destroying any previous contents.  Subsequent calls return
     /// the same writer.  The writer can be used concurrently by multiple threads. Throws an
     /// exception if an error occurs.
-    std::shared_ptr<TableWriter<Key, Record>> getWriter() { return TableWriter<Key, Record>( m_table->getWriter() ); }
+    std::shared_ptr<GenericTableWriter> getWriter() override;
 
     /// Get a TableReader that can be used to read records from the table.  The table is opened for
     /// reading when the first reader is requested.  Subsequent calls returns the same reader, which
     /// can be used concurrently by multiple threads.  getReader() should not be called before
     /// getWriter(), since creating a writer might reinitialize the table, which invalidates any
     /// readers.  Throws an exception if an error occurs.
-    std::shared_ptr<TableReader<Key, Record>> getReader() { return TableReader<Key, Record>( m_table->getReader() ); }
+    std::shared_ptr<GenericTableReader> getReader() override;
 
     /// Get the table name.
-    const std::string& getTableName() const { return m_table->getTableName(); }
+    const std::string& getTableName() const override { return m_tableName; }
 
-    /// Check whether the object store has been initialized via getWriter().
-    bool exists() const { return m_table->exists(); }
+    /// Check whether the table has been initialized via getWriter().
+    bool exists() const override;
 
     /// Close the table, releasing any reader and writer instances.
-    void close() { return m_table->close(); }
+    void close() override;
 
-    /// Destroy the table, removing any associated disk files.  Any previously created writers or
-    /// readers should be destroyed before calling destroy().
-    void destroy() { return m_table->destroy(); }
+    /// Destroy the table, closing it if necessary and removing any associated disk files.
+    /// Any previously created writers or readers should be destroyed before calling destroy().
+    void destroy() override;
+
+  protected:
+    friend class GenericTableReaderImpl;
+    friend class GenericTableWriterImpl;
+
+    const std::filesystem::path& getDataFile() const { return m_dataFile; }
 
   private:
-    std::shared_ptr<GenericTable> m_table;
-    
-    Table( std::shared_ptr<GenericTable> table )
-        : m_table( table )
-    {
-    }
+    const std::string           m_tableName;
+    const std::filesystem::path m_directory;
+    const std::filesystem::path m_dataFile;
+
+    std::mutex m_mutex;
+    std::shared_ptr<GenericTableWriterImpl> m_writer;
+    std::shared_ptr<GenericTableReaderImpl> m_reader;
 };
 
-} // namespace sceneDB
+}  // namespace sceneDB

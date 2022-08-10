@@ -45,9 +45,9 @@ add_library(SceneDB SHARED
   src/ObjectStoreImpl.cpp
   src/ObjectStoreReaderImpl.cpp
   src/ObjectStoreWriterImpl.cpp
-  src/TableImpl.cpp
-  src/TableReaderImpl.cpp
-  src/TableWriterImpl.cpp
+  src/GenericTableImpl.cpp
+  src/GenericTableReaderImpl.cpp
+  src/GenericTableWriterImpl.cpp
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -60,6 +60,9 @@ target_sources(SceneDB
   BASE_DIRS include
   FILES
   include/OptiXToolkit/SceneDB/DataBlock.h
+  include/OptiXToolkit/SceneDB/GenericTable.h
+  include/OptiXToolkit/SceneDB/GenericTableReader.h
+  include/OptiXToolkit/SceneDB/GenericTableWriter.h
   include/OptiXToolkit/SceneDB/ObjectStore.h
   include/OptiXToolkit/SceneDB/ObjectStoreReader.h
   include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
@@ -73,9 +76,9 @@ source_group( "Header Files\\Implementation" FILES
   src/ObjectStoreImpl.h
   src/ObjectStoreReaderImpl.h
   src/ObjectStoreWriterImpl.h
-  src/TableImpl.h
-  src/TableReaderImpl.h
-  src/TableWriterImpl.h
+  src/GenericTableImpl.h
+  src/GenericTableReaderImpl.h
+  src/GenericTableWriterImpl.h
   )
 
 target_include_directories(SceneDB PUBLIC

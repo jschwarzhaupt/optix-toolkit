@@ -26,33 +26,51 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#pragma once
+#include "GenericTableWriterImpl.h"
+#include "GenericTableImpl.h"
 
-#include <OptiXToolkit/SceneDB/TableReader.h>
+#include <OptiXToolkit/Util/Exception.h>
 
-#include <memory>
+#include <filesystem>
+
+using path = std::filesystem::path;
 
 namespace sceneDB {
 
-/** TableReader is a thread-safe reader for a Table. */
-class TableReaderImpl : public TableReader
+GenericTableWriterImpl::GenericTableWriterImpl( const GenericTableImpl& table )
 {
-  public:
-    /// Destroy TableReader, releasing any associated resources.
-    ~TableReaderImpl() = default;
+}
 
-    /// Get the record size.
-    size_t getRecordSize() override;
-        
-    /// Find the record with the specified key.  Returns true for success, copying the record data
-    /// into the given buffer.  Thread safe.
-    bool find( KeyPtr key, RecordPtr record ) override;
+GenericTableWriterImpl::~GenericTableWriterImpl()
+{
+}
 
-  protected:
-    friend class TableImpl;
+bool GenericTableWriterImpl::insert( KeyPtr key, RecordPtr record )
+{
+    // XXX TODO
+    return false;
+}
 
-    /// Use Table::getReader() to obtain an TableReader.
-    TableReaderImpl( const class TableImpl& table );
-};
+bool GenericTableWriterImpl::update( KeyPtr key, void* data, size_t size, size_t offset )
+{
+    // XXX TODO
+    return false;
+}
+
+bool GenericTableWriterImpl::updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
+{
+    // XXX TODO
+    return false;
+}
+
+void GenericTableWriterImpl::remove( KeyPtr key )
+{
+    // XXX TODO
+}
+
+void GenericTableWriterImpl::flush()
+{
+    // XXX TODO
+}
 
 }  // namespace sceneDB

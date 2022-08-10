@@ -28,49 +28,31 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/TableWriter.h>
+#include <OptiXToolkit/SceneDB/GenericTableReader.h>
 
-#include <cstddef>
 #include <memory>
-#include <mutex>
-#include <unordered_set>
-#include <string>
-#include <vector>
 
 namespace sceneDB {
 
-/** TableWriter is used to insert fixed-sized records into a Table, associating them with keys of
-    arbitrary (fixed) size. */
-class TableWriterImpl : public TableWriter
+/** GenericTableReader is a thread-safe reader for a GenericTable. */
+class GenericTableReaderImpl : public GenericTableReader
 {
   public:
-    /// Destroy TableWriter, closing any associated files.
-    ~TableWriterImpl() override;
-    
-    /// Insert a record with the specified key. Thread safe. Throws an exception if an error occurs.
-    bool insert( KeyPtr key, RecordPtr record ) override;
+    /// Destroy GenericTableReader, releasing any associated resources.
+    ~GenericTableReaderImpl() = default;
 
-    /// Update the record with the specified key, copying the given data to the specified offset in
-    /// the record. Thread safe.  Throws an exception if an error occurs.
-    bool update( KeyPtr key, void* data, size_t size, size_t offset ) override;
-
-    /// Perform muliple record updates, copying each DataBlock to the corresponding offset in the
-    /// record.  Thread safe.  Throws an exception if an error occurs.
-    bool updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks ) override;
-
-    /// Remove record with the specified key, if any. Thread safe. Throws an exception if an error
-    /// occurs.
-    void remove( KeyPtr key ) override;
-
-    /// Flush any buffered data from previous operations to disk.  Data from any concurrent
-    /// operations is not guaranteed to be flushed.
-    void flush() override;
+    /// Get the record size.
+    size_t getRecordSize() override;
+        
+    /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
+    /// Thread safe.
+    GenericTableReader::RecordPtr find( KeyPtr key ) override;
 
   protected:
-    friend class TableImpl;
+    friend class GenericTableImpl;
 
-    /// Use Table::getWriter() to obtain a TableWriter.
-    TableWriterImpl( const class TableImpl& table );
+    /// Use GenericTable::getReader() to obtain an GenericTableReader.
+    GenericTableReaderImpl( const class GenericTableImpl& table );
 };
 
 }  // namespace sceneDB

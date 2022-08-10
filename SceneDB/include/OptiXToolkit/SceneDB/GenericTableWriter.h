@@ -28,24 +28,46 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/GenericTableReader.h>
+#include <OptiXToolkit/SceneDB/DataBlock.h>
+#include <OptiXToolkit/Util/Exception.h>
+
+#include <cstdint>
+#include <memory>
 
 namespace sceneDB {
 
-/** TableReader is a templated wrapper for GenericTableReader. */
-template<typename Key, class Record>
-class TableReader
+/** GenericTableWriter is used to insert fixed-sized records into a GenericTable, associating them with keys of
+    arbitrary (fixed) size.  */
+class GenericTableWriter
 {
   public:
-    /// Destroy reader, releasing any associated resources.
-    virtual ~TableReader() = default;
+    /// Generic key pointer type.
+    using KeyPtr = const void*;
 
-    /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
-    /// Thread safe.  TODO: describe snapshot lifetime guarantee.
-    Record* find( const Key& key ) { return reinterpret_cast<Record*>( m_reader->find( &key ) ); }
+    /// Generic record pointer type.
+    using RecordPtr = const void*;
+    
+    /// Destroy writer, releasing any associated resources.
+    virtual ~GenericTableWriter() = default;
 
-  private:
-    std::unique_ptr<GenericTableReader> m_reader;
+    /// Insert a record with the specified key. Thread safe. Throws an exception if an error occurs.
+    virtual bool insert( KeyPtr key, RecordPtr record ) = 0;
+
+    /// Update the record with the specified key, copying the given data to the specified offset in
+    /// the record. Thread safe.  Throws an exception if an error occurs.
+    virtual bool update( KeyPtr key, void* data, size_t size, size_t offset ) = 0;
+
+    /// Perform muliple record updates, copying each DataBlock to the corresponding offset in the
+    /// record.  Thread safe.  Throws an exception if an error occurs.
+    virtual bool updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks ) = 0;
+
+    /// Remove record with the specified key, if any. Thread safe. Throws an exception if an error
+    /// occurs.
+    virtual void remove( KeyPtr key ) = 0;
+
+    /// Flush any buffered data from previous operations to disk.  Data from any concurrent
+    /// operations is not guaranteed to be flushed.
+    virtual void flush() = 0;
 };
 
 }  // namespace sceneDB

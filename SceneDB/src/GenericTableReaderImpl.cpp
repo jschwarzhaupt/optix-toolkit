@@ -26,8 +26,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "TableWriterImpl.h"
-#include "TableImpl.h"
+#include "GenericTableReaderImpl.h"
+#include "GenericTableImpl.h"
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -37,40 +37,20 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-TableWriterImpl::TableWriterImpl( const TableImpl& table )
+GenericTableReaderImpl::GenericTableReaderImpl( const GenericTableImpl& table )
 {
 }
 
-TableWriterImpl::~TableWriterImpl()
-{
-}
-
-bool TableWriterImpl::insert( KeyPtr key, RecordPtr record )
+size_t GenericTableReaderImpl::getRecordSize()
 {
     // XXX TODO
-    return false;
+    return 0;
 }
 
-bool TableWriterImpl::update( KeyPtr key, void* data, size_t size, size_t offset )
+GenericTableReader::RecordPtr GenericTableReaderImpl::find( KeyPtr key )
 {
     // XXX TODO
-    return false;
-}
-
-bool TableWriterImpl::updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
-{
-    // XXX TODO
-    return false;
-}
-
-void TableWriterImpl::remove( KeyPtr key )
-{
-    // XXX TODO
-}
-
-void TableWriterImpl::flush()
-{
-    // XXX TODO
+    return nullptr;
 }
 
 }  // namespace sceneDB
