@@ -53,7 +53,7 @@ bool GenericTableImpl::exists() const
     return std::filesystem::exists( m_dataFile );
 }
 
-std::shared_ptr<GenericTableWriter> GenericTableImpl::getWriter()
+std::shared_ptr<GenericTableWriter> GenericTableImpl::getWriter( std::shared_ptr<GenericTable> table )
 {
     std::unique_lock<std::mutex> lock( m_mutex );
     OTK_ASSERT_MSG( !m_reader, "GenericTable::getReader should not be called before getWriter" );
@@ -71,7 +71,7 @@ std::shared_ptr<GenericTableWriter> GenericTableImpl::getWriter()
     return m_writer;
 }
 
-std::shared_ptr<GenericTableReader> GenericTableImpl::getReader()
+std::shared_ptr<GenericTableReader> GenericTableImpl::getReader( std::shared_ptr<GenericTable> table )
 {
     std::unique_lock<std::mutex> lock( m_mutex );
     if( !m_reader )

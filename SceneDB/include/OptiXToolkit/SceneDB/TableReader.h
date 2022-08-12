@@ -42,10 +42,18 @@ class TableReader
 
     /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
     /// Thread safe.  TODO: describe snapshot lifetime guarantee.
-    Record* find( const Key& key ) { return reinterpret_cast<Record*>( m_reader->find( &key ) ); }
+    const Record* find( const Key& key ) { return reinterpret_cast<const Record*>( m_reader->find( &key ) ); }
+
+  protected:
+    friend class Table<Key, Record>;
+
+    TableReader( std::shared_ptr<GenericTableReader> reader )
+        : m_reader( std::move( reader ) )
+    {
+    }
 
   private:
-    std::unique_ptr<GenericTableReader> m_reader;
+    std::shared_ptr<GenericTableReader> m_reader;
 };
 
 }  // namespace sceneDB

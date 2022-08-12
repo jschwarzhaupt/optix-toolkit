@@ -28,6 +28,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 namespace sceneDB {
 
@@ -50,14 +51,14 @@ class GenericTable
     /// when a writer is first created, destroying any previous contents.  Subsequent calls return
     /// the same writer.  The writer can be used concurrently by multiple threads. Throws an
     /// exception if an error occurs.
-    virtual std::shared_ptr<GenericTableWriter> getWriter() = 0;
+    virtual std::shared_ptr<class GenericTableWriter> getWriter( std::shared_ptr<GenericTable> table ) = 0;
 
     /// Get a TableReader that can be used to read records from the table.  The table is opened for
     /// reading when the first reader is requested.  Subsequent calls returns the same reader, which
     /// can be used concurrently by multiple threads.  getReader() should not be called before
     /// getWriter(), since creating a writer might reinitialize the table, which invalidates any
     /// readers.  Throws an exception if an error occurs.
-    virtual std::shared_ptr<GenericTableReader> getReader() = 0;
+    virtual std::shared_ptr<class GenericTableReader> getReader( std::shared_ptr<GenericTable> table ) = 0;
 
     /// Get the table name.
     virtual const std::string& getTableName() const = 0;
@@ -73,4 +74,4 @@ class GenericTable
     virtual void destroy() = 0;
 };
 
-} // namespace sceneDB
+}  // namespace sceneDB

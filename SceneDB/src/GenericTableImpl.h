@@ -56,14 +56,14 @@ class GenericTableImpl : public GenericTable
     /// when a writer is first created, destroying any previous contents.  Subsequent calls return
     /// the same writer.  The writer can be used concurrently by multiple threads. Throws an
     /// exception if an error occurs.
-    std::shared_ptr<GenericTableWriter> getWriter() override;
+    std::shared_ptr<GenericTableWriter> getWriter( std::shared_ptr<GenericTable> table ) override;
 
     /// Get a TableReader that can be used to read records from the table.  The table is opened for
     /// reading when the first reader is requested.  Subsequent calls returns the same reader, which
     /// can be used concurrently by multiple threads.  getReader() should not be called before
     /// getWriter(), since creating a writer might reinitialize the table, which invalidates any
     /// readers.  Throws an exception if an error occurs.
-    std::shared_ptr<GenericTableReader> getReader() override;
+    std::shared_ptr<GenericTableReader> getReader(std::shared_ptr<GenericTable> table) override;
 
     /// Get the table name.
     const std::string& getTableName() const override { return m_tableName; }

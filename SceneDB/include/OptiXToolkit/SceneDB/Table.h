@@ -28,6 +28,8 @@
 #pragma once
 
 #include <OptiXToolkit/SceneDB/GenericTable.h>
+#include <OptiXToolkit/SceneDB/TableWriter.h>
+#include <OptiXToolkit/SceneDB/TableReader.h>
 
 namespace sceneDB {
 
@@ -39,7 +41,8 @@ class Table
     /// Get an instance of Table with the given name in the specified directory.
     static std::shared_ptr<Table> createInstance( const char* directory, const char* tableName )
     {
-        return new Table( GenericTable::createInstance( directory, tableName, sizeof( Key ), sizeof( Record ), alignof( Record ) ) );
+        return std::shared_ptr<Table>( new Table(
+            GenericTable::createInstance( directory, tableName, sizeof( Key ), sizeof( Record ), alignof( Record ) ) ) );
     }
 
     /// Close a Table.  The contents of the table persist until it is destroyed via the destroy() method.
@@ -49,14 +52,20 @@ class Table
     /// when a writer is first created, destroying any previous contents.  Subsequent calls return
     /// the same writer.  The writer can be used concurrently by multiple threads. Throws an
     /// exception if an error occurs.
-    std::shared_ptr<TableWriter<Key, Record>> getWriter() { return TableWriter<Key, Record>( m_table->getWriter() ); }
+    std::shared_ptr<TableWriter<Key, Record>> getWriter()
+    {
+        return std::shared_ptr<TableWriter<Key, Record>>( new TableWriter<Key, Record>( m_table->getWriter( m_table ) ) );
+    }
 
     /// Get a TableReader that can be used to read records from the table.  The table is opened for
     /// reading when the first reader is requested.  Subsequent calls returns the same reader, which
     /// can be used concurrently by multiple threads.  getReader() should not be called before
     /// getWriter(), since creating a writer might reinitialize the table, which invalidates any
     /// readers.  Throws an exception if an error occurs.
-    std::shared_ptr<TableReader<Key, Record>> getReader() { return TableReader<Key, Record>( m_table->getReader() ); }
+    std::shared_ptr<TableReader<Key, Record>> getReader()
+    {
+        return std::shared_ptr<TableReader<Key, Record>>( new TableReader<Key, Record>( m_table->getReader( m_table ) ) );
+    }
 
     /// Get the table name.
     const std::string& getTableName() const { return m_table->getTableName(); }

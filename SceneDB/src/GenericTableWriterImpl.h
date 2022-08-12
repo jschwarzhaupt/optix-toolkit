@@ -62,6 +62,11 @@ class GenericTableWriterImpl : public GenericTableWriter
     /// occurs.
     void remove( KeyPtr key ) override;
 
+    /// Take a snapshot, flushing data to disk if necessary and notifying any readers of changes
+    /// since the previous snapshot.  Once a snapshot has been taken, subsequent insertions and
+    /// updates are copy-on-write, and readers see an immutable view of the table.
+    void takeSnapshot() override;
+
     /// Flush any buffered data from previous operations to disk.  Data from any concurrent
     /// operations is not guaranteed to be flushed.
     void flush() override;
@@ -71,6 +76,9 @@ class GenericTableWriterImpl : public GenericTableWriter
 
     /// Use Table::getWriter() to obtain a GenericTableWriter.
     GenericTableWriterImpl( const class GenericTableImpl& table );
+
+  private:
+    const class GenericTableImpl& m_table;
 };
 
 }  // namespace sceneDB

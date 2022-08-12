@@ -38,6 +38,7 @@ using path = std::filesystem::path;
 namespace sceneDB {
 
 GenericTableWriterImpl::GenericTableWriterImpl( const GenericTableImpl& table )
+    : m_table(table)
 {
 }
 
@@ -64,6 +65,11 @@ bool GenericTableWriterImpl::updateV( KeyPtr key, DataBlock* dataBlocks, size_t*
 }
 
 void GenericTableWriterImpl::remove( KeyPtr key )
+{
+    // XXX TODO
+}
+
+void GenericTableWriterImpl::takeSnapshot()
 {
     // XXX TODO
 }

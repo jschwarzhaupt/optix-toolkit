@@ -32,6 +32,9 @@
 
 namespace sceneDB {
 
+template <typename Key, class Record>
+class Table;  // forward declaration
+
 /** TableWriter is a templated wrapper for GenericTableWriter.  It is used to insert fixed-sized
     records into a Table, associating them with keys of arbitrary (fixed) size.  */
 template <typename Key, class Record>
@@ -62,12 +65,25 @@ class TableWriter
     /// occurs.
     void remove( Key key ) { m_writer->remove( &key ); }
 
+    /// Take a snapshot, flushing data to disk if necessary and notifying any readers of changes
+    /// since the previous snapshot.  Once a snapshot has been taken, subsequent insertions and
+    /// updates are copy-on-write, and readers see an immutable view of the table.
+    void takeSnapshot() { m_writer->takeSnapshot(); }
+    
     /// Flush any buffered data from previous operations to disk.  Data from any concurrent
     /// operations is not guaranteed to be flushed.
     void flush() { m_writer->flush(); }
 
+  protected:
+    friend class Table<Key, Record>;
+
+    TableWriter( std::shared_ptr<GenericTableWriter> writer )
+        : m_writer( std::move( writer ) )
+    {
+    }
+
   private:
-    std::unique_ptr<GenericTableWriter> m_writer;
+    std::shared_ptr<GenericTableWriter> m_writer;
 };
 
 }  // namespace sceneDB
