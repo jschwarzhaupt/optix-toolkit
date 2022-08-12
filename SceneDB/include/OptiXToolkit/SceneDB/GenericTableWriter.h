@@ -68,7 +68,7 @@ class GenericTableWriter
     /// Take a snapshot, flushing data to disk if necessary and notifying any readers of changes
     /// since the previous snapshot.  Once a snapshot has been taken, subsequent insertions and
     /// updates are copy-on-write, and readers see an immutable view of the table.
-    virtual void takeSnapshot() = 0;
+    virtual std::shared_ptr<class Snapshot> takeSnapshot() = 0;
 
     /// Flush any buffered data from previous operations to disk.  Data from any concurrent
     /// operations is not guaranteed to be flushed.

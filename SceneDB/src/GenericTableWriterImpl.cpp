@@ -69,9 +69,10 @@ void GenericTableWriterImpl::remove( KeyPtr key )
     // XXX TODO
 }
 
-void GenericTableWriterImpl::takeSnapshot()
+std::shared_ptr<class Snapshot> GenericTableWriterImpl::takeSnapshot()
 {
     // XXX TODO
+    return std::shared_ptr<class Snapshot>();
 }
 
 void GenericTableWriterImpl::flush()

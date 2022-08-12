@@ -50,7 +50,10 @@ class GenericTableReader
 
     /// Get the record size.
     virtual size_t getRecordSize() = 0;
-        
+
+    /// Set snapshot in which records are found.  (See GenericTableWriter::takeSnapshot.)
+    virtual void setSnapshot( std::shared_ptr<class Snapshot> snapshot ) = 0;
+
     /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
     /// Thread safe.  TODO: describe snapshot lifetime guarantee.
     virtual RecordPtr find( KeyPtr key ) = 0;

@@ -40,6 +40,9 @@ class TableReader
     /// Destroy reader, releasing any associated resources.
     virtual ~TableReader() = default;
 
+    /// Set snapshot in which records are found.  (See TableWriter::takeSnapshot.)
+    void setSnapshot( std::shared_ptr<class Snapshot> snapshot ) { m_reader->setSnapshot( snapshot ); }
+
     /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
     /// Thread safe.  TODO: describe snapshot lifetime guarantee.
     const Record* find( const Key& key ) { return reinterpret_cast<const Record*>( m_reader->find( &key ) ); }

@@ -65,10 +65,10 @@ class TableWriter
     /// occurs.
     void remove( Key key ) { m_writer->remove( &key ); }
 
-    /// Take a snapshot, flushing data to disk if necessary and notifying any readers of changes
-    /// since the previous snapshot.  Once a snapshot has been taken, subsequent insertions and
-    /// updates are copy-on-write, and readers see an immutable view of the table.
-    void takeSnapshot() { m_writer->takeSnapshot(); }
+    /// Take a snapshot, flushing data to disk if necessary.  Once a snapshot has been taken,
+    /// readers can use it as an immutable view of the table.  Subsequent insertions and updates are
+    /// copy-on-write.
+    std::shared_ptr<class Snapshot> takeSnapshot() { return m_writer->takeSnapshot(); }
     
     /// Flush any buffered data from previous operations to disk.  Data from any concurrent
     /// operations is not guaranteed to be flushed.

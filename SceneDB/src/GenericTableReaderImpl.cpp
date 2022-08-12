@@ -47,6 +47,11 @@ size_t GenericTableReaderImpl::getRecordSize()
     return 0;
 }
 
+void GenericTableReaderImpl::setSnapshot( std::shared_ptr<class Snapshot> snapshot )
+{
+    // XXX TODO
+}
+
 GenericTableReader::RecordPtr GenericTableReaderImpl::find( KeyPtr key )
 {
     // XXX TODO

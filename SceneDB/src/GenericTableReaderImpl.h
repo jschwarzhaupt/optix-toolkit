@@ -43,7 +43,10 @@ class GenericTableReaderImpl : public GenericTableReader
 
     /// Get the record size.
     size_t getRecordSize() override;
-        
+
+    /// Set snapshot in which records are found.  (See GenericTableWriter::takeSnapshot.)
+    void setSnapshot( std::shared_ptr<class Snapshot> snapshot ) override;
+    
     /// Get a pointer the record with the specified key.  Returns a null pointer if not found.
     /// Thread safe.
     GenericTableReader::RecordPtr find( KeyPtr key ) override;
