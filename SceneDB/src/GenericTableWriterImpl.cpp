@@ -37,9 +37,12 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-GenericTableWriterImpl::GenericTableWriterImpl( const GenericTableImpl& table )
-    : m_table(table)
+GenericTableWriterImpl::GenericTableWriterImpl( std::shared_ptr<ObjectStoreWriter> writer, size_t keySize, size_t recordSize )
+    : m_writer( writer )
+    , m_recordSize( recordSize )
 {
+    // Interim implementation uses ObjectStoreWriter.
+    OTK_ASSERT( keySize == sizeof( uint64_t ) );
 }
 
 GenericTableWriterImpl::~GenericTableWriterImpl()
@@ -48,36 +51,39 @@ GenericTableWriterImpl::~GenericTableWriterImpl()
 
 bool GenericTableWriterImpl::insert( KeyPtr key, RecordPtr record )
 {
-    // XXX TODO
-    return false;
+    // Kludge:
+    ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
+    return m_writer->insert(ikey, record, m_recordSize);
 }
 
 bool GenericTableWriterImpl::update( KeyPtr key, void* data, size_t size, size_t offset )
 {
-    // XXX TODO
+    OTK_ASSERT_MSG( false, "XXX GenericTableWriterImpl::update is TODO" );
     return false;
 }
 
 bool GenericTableWriterImpl::updateV( KeyPtr key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
 {
-    // XXX TODO
+    OTK_ASSERT_MSG( false, "XXX GenericTableWriterImpl::updateV is TODO" );
     return false;
 }
 
 void GenericTableWriterImpl::remove( KeyPtr key )
 {
-    // XXX TODO
+    // Kludge:
+    ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
+    m_writer->remove( ikey );
 }
 
 std::shared_ptr<class Snapshot> GenericTableWriterImpl::takeSnapshot()
 {
-    // XXX TODO
+    OTK_ASSERT_MSG( false, "XXX GenericTableWriterImpl::takeSnapshot TODO" );
     return std::shared_ptr<class Snapshot>();
 }
 
 void GenericTableWriterImpl::flush()
 {
-    // XXX TODO
+    m_writer->flush();
 }
 
 }  // namespace sceneDB

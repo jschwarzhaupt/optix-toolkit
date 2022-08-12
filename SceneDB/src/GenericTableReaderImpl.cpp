@@ -37,25 +37,33 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-GenericTableReaderImpl::GenericTableReaderImpl( const GenericTableImpl& table )
+GenericTableReaderImpl::GenericTableReaderImpl( std::shared_ptr<ObjectStoreReader> reader, size_t keySize, size_t recordSize )
+    : m_reader( reader )
+    , m_recordSize( recordSize )
 {
+    // Interim implementation uses ObjectStoreReader.
+    OTK_ASSERT( keySize == sizeof( uint64_t ) );
 }
 
 size_t GenericTableReaderImpl::getRecordSize()
 {
-    // XXX TODO
-    return 0;
+    return m_recordSize;
 }
 
 void GenericTableReaderImpl::setSnapshot( std::shared_ptr<class Snapshot> snapshot )
 {
-    // XXX TODO
+    OTK_ASSERT_MSG( false, "XXX GenericTableReaderImpl::setSnapshot is TODO" );
+
 }
 
 GenericTableReader::RecordPtr GenericTableReaderImpl::find( KeyPtr key )
 {
-    // XXX TODO
-    return nullptr;
+    // Kludge:
+    ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
+
+    std::vector<char>* buffer = new std::vector<char>();  // XXX this leaks (interim implementation).
+    m_reader->find( ikey, *buffer );
+    return reinterpret_cast<RecordPtr>( buffer->data() );
 }
 
 }  // namespace sceneDB

@@ -56,14 +56,14 @@ class TableWriter
 
     /// Perform muliple record updates, copying each DataBlock to the corresponding offset in the
     /// record.  Thread safe.  Throws an exception if an error occurs.
-    bool updateV( const Key key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
+    bool updateV( const Key& key, DataBlock* dataBlocks, size_t* offsets, int numDataBlocks )
     {
         return m_writer->updateV( key, dataBlocks, offsets, numDataBlocks );
     }
 
     /// Remove record with the specified key, if any. Thread safe. Throws an exception if an error
     /// occurs.
-    void remove( Key key ) { m_writer->remove( &key ); }
+    void remove( const Key& key ) { m_writer->remove( &key ); }
 
     /// Take a snapshot, flushing data to disk if necessary.  Once a snapshot has been taken,
     /// readers can use it as an immutable view of the table.  Subsequent insertions and updates are

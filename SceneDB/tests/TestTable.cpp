@@ -41,12 +41,12 @@ class TestTable : public testing::Test
     using Record = uint64_t;
     std::shared_ptr<Table<Key, Record>> m_table;
 
-    void SetUp() { m_table = Table<Key, Record>::createInstance( ".", "_table" ); }
+    void SetUp() { m_table = Table<Key, Record>::createInstance( "_tableDir", "_table" ); }
 
     void Destroy() { m_table.reset(); }
 };
 
-TEST_F(TestTable, DISABLED_TestCreateDestroy)
+TEST_F(TestTable, TestCreateDestroy)
 {
     auto writer = m_table->getWriter();
     EXPECT_TRUE( m_table->exists() );
@@ -54,7 +54,7 @@ TEST_F(TestTable, DISABLED_TestCreateDestroy)
     m_table->destroy();
 }
 
-TEST_F(TestTable, DISABLED_TestInsert)
+TEST_F(TestTable, TestInsert)
 {
     auto writer = m_table->getWriter();
     writer->insert( 1, 2 );
@@ -63,7 +63,7 @@ TEST_F(TestTable, DISABLED_TestInsert)
     m_table->destroy();
 }
 
-TEST_F(TestTable, DISABLED_TestWriteAndRead)
+TEST_F(TestTable, TestWriteAndRead)
 {
     auto writer = m_table->getWriter();
     writer->insert( 1, 2 );
@@ -84,7 +84,7 @@ TEST_F(TestTable, DISABLED_TestWriteAndRead)
     m_table->destroy();
 }
 
-TEST_F(TestTable, DISABLED_TestRemove)
+TEST_F(TestTable, TestRemove)
 {
     auto writer = m_table->getWriter();
     
@@ -92,7 +92,7 @@ TEST_F(TestTable, DISABLED_TestRemove)
     writer->insert( 3, 4 );
     writer->remove( 1 );
     writer->insert( 1, 6 );
-    writer->remove( 2 );
+    writer->remove( 3 );
     writer.reset();
 
     auto reader = m_table->getReader();

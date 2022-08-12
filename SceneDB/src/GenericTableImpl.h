@@ -32,6 +32,7 @@
 #include "GenericTableWriterImpl.h"
 
 #include <OptiXToolkit/SceneDB/GenericTable.h>
+#include <OptiXToolkit/SceneDB/ObjectStore.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -84,14 +85,24 @@ class GenericTableImpl : public GenericTable
 
     const std::filesystem::path& getDataFile() const { return m_dataFile; }
 
+    // Interim implementation uses ObjectStore.
+    std::shared_ptr<ObjectStore> getStore() const { return m_store; }
+
   private:
     const std::string           m_tableName;
     const std::filesystem::path m_directory;
     const std::filesystem::path m_dataFile;
 
+    size_t m_keySize;
+    size_t m_recordSize;
+    size_t m_recordAlignment;
+
     std::mutex m_mutex;
     std::shared_ptr<GenericTableWriterImpl> m_writer;
     std::shared_ptr<GenericTableReaderImpl> m_reader;
+
+    // Interim implementation uses ObjectStore.
+    std::shared_ptr<ObjectStore> m_store;
 };
 
 }  // namespace sceneDB
