@@ -42,8 +42,9 @@ using namespace sceneDB;
 class ObjectStorePerfTest
 {
   public:
-    ObjectStorePerfTest( const char* statsFilename )
+    ObjectStorePerfTest( const char* statsFilename, bool useGds )
         : m_statsFile( fopen( statsFilename, "w" ) )
+        , m_useGds( useGds )
     {
         OTK_ASSERT_MSG( m_statsFile != nullptr, "Error opening stats file" );
         fprintf( m_statsFile, "num threads,num objects,object size,write throughput,read throughput,metadata throughput\n" );
@@ -60,6 +61,7 @@ class ObjectStorePerfTest
   private:
     const unsigned int m_maxThreads = std::thread::hardware_concurrency();
     FILE*              m_statsFile;
+    bool               m_useGds;
 
     struct Params
     {
@@ -99,6 +101,7 @@ class ObjectStorePerfTest
         otk::Stopwatch metadataTimer;
         ObjectStoreReader::Options options;
         options.pollForUpdates = false;
+        options.useGds = m_useGds;
         std::unique_ptr<ObjectReaders> readers(
             new ObjectReaders( store, options, objectSizes, /*validateData=*/false, params.numThreads ) );
         double metadataTime   = metadataTimer.elapsed();
@@ -161,21 +164,28 @@ class ObjectStorePerfTest
 
     // Test filesystem cache exhaustion.
     void testFilesystemCache()
+    {
+        const unsigned int MILLION = 1000000;
+        for (unsigned int numObjects = 5 * MILLION; numObjects <= 100 * MILLION; numObjects += 5 * MILLION)
         {
-            const unsigned int MILLION = 1000000;
-            for (unsigned int numObjects = 5 * MILLION; numObjects <= 100 * MILLION; numObjects += 5 * MILLION)
-            {
-                // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
-                run( Params{12, numObjects, 4 * 1024, false, false} );
-            }
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{12, numObjects, 4 * 1024, false, false} );
         }
+    }
 };
 
 int main()
 {
-    ObjectStorePerfTest("object size.csv").testObjectSize();
-    ObjectStorePerfTest("threading with 4K objects.csv").testThreads4K();
-    ObjectStorePerfTest("threading with 12K objects.csv").testThreads12K();
-    ObjectStorePerfTest("filesystem cache.csv").testFilesystemCache();
+    ObjectStorePerfTest("object size.csv", false).testObjectSize();
+    ObjectStorePerfTest("threading with 4K objects.csv", false).testThreads4K();
+    ObjectStorePerfTest("threading with 12K objects.csv", false).testThreads12K();
+    ObjectStorePerfTest("filesystem cache.csv", false).testFilesystemCache();
+
+    // Measure GDS
+    // ObjectStorePerfTest("object size GDS.csv", true).testObjectSize();
+    // ObjectStorePerfTest("threading with 4K objects GDS.csv", true).testThreads4K();
+    // ObjectStorePerfTest("threading with 12K objects GDS.csv", true).testThreads12K();
+    // ObjectStorePerfTest("filesystem cache.csv GDS", true).testFilesystemCache();
+
     return 0;
 }
