@@ -46,6 +46,7 @@ target_link_libraries( testSceneDB
   SceneDB
   OptiXToolkit::Util
   gtest
+  CUDA::cudart
   )
 
 # Copy shared libraries that the built executable depends on.

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "ObjectStoreReaderImpl.h"
+#include "ObjectStoreReaderGdsImpl.h"
 #include "ObjectStoreWriterImpl.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
@@ -78,6 +79,7 @@ class ObjectStoreImpl : public ObjectStore
 
   protected:
     friend class ObjectStoreReaderImpl;
+    friend class ObjectStoreReaderGdsImpl;
     friend class ObjectStoreWriterImpl;
 
     const std::filesystem::path& getDataFile() const { return m_dataFile; }
@@ -90,7 +92,7 @@ class ObjectStoreImpl : public ObjectStore
 
     std::mutex m_mutex;
     std::shared_ptr<ObjectStoreWriterImpl> m_writer;
-    std::shared_ptr<ObjectStoreReaderImpl> m_reader;
+    std::shared_ptr<ObjectStoreReader> m_reader;
 };
 
 }  // namespace sceneDB

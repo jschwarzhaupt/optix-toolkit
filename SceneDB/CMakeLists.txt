@@ -38,12 +38,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(GNUInstallDirs)
 include(../CMake/BuildConfig.cmake)
 
+find_package( CUDAToolkit 11.1 REQUIRED )
+
 add_library(SceneDB SHARED
   src/AppendOnlyFile.cpp
   src/ObjectFileReader.cpp
+  src/ObjectFileReaderGds.cpp
   src/ObjectIndex.cpp
   src/ObjectStoreImpl.cpp
   src/ObjectStoreReaderImpl.cpp
+  src/ObjectStoreReaderGdsImpl.cpp
   src/ObjectStoreWriterImpl.cpp
   src/GenericTableImpl.cpp
   src/GenericTableReaderImpl.cpp
@@ -75,6 +79,7 @@ source_group( "Header Files\\Implementation" FILES
   src/AppendOnlyFile.h
   src/ObjectStoreImpl.h
   src/ObjectStoreReaderImpl.h
+  src/ObjectStoreReaderGdsImpl.h
   src/ObjectStoreWriterImpl.h
   src/GenericTableImpl.h
   src/GenericTableReaderImpl.h
@@ -86,8 +91,17 @@ target_include_directories(SceneDB PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
+# cufile library (required for GDS) not found by find package( CUDAtoolkit ... )
+find_library(CUFILE_LIBRARY
+  NAMES cufile libcufile
+  HINTS ${CUDAToolkit_LIBRARY_DIR}  
+  ) 
+
 target_link_libraries(SceneDB PRIVATE
-  OptiXToolkit::Util )
+  OptiXToolkit::Util 
+  CUDA::cudart
+  ${CUFILE_LIBRARY}
+  )
 
 set_target_properties(SceneDB PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 

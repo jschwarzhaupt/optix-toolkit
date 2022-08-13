@@ -87,7 +87,14 @@ std::shared_ptr<ObjectStoreReader> ObjectStoreImpl::getReader( const ObjectStore
     else
     {
         // Create a new reader.
-        m_reader.reset( new ObjectStoreReaderImpl( *this, options ) );
+        if( options.useGds )
+        {
+            m_reader.reset( new ObjectStoreReaderGdsImpl( *this, options ) );
+        }
+        else
+        {
+            m_reader.reset( new ObjectStoreReaderImpl( *this, options ) );
+        }
     }
     return m_reader;
 }

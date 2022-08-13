@@ -61,9 +61,10 @@ GenericTableReader::RecordPtr GenericTableReaderImpl::find( KeyPtr key )
     // Kludge:
     ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
 
-    std::vector<char>* buffer = new std::vector<char>();  // XXX this leaks (interim implementation).
-    m_reader->find( ikey, *buffer );
-    return reinterpret_cast<RecordPtr>( buffer->data() );
+    void* buffer = 0;
+    size_t size  = 0;
+    m_reader->find( ikey, buffer, size );
+    return reinterpret_cast<RecordPtr>( buffer );
 }
 
 }  // namespace sceneDB

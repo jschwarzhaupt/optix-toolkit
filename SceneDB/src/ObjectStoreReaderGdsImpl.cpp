@@ -26,10 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectStoreReaderImpl.h"
-#include "ObjectFileReader.h"
+#include "ObjectStoreReaderGdsImpl.h"
+#include "ObjectFileReaderGds.h"
 #include "ObjectIndex.h"
 #include "ObjectStoreImpl.h"
+
+#include <cuda_runtime.h>
 
 #include <OptiXToolkit/Util/Exception.h>
 
@@ -39,18 +41,18 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore, const Options& options )
+ObjectStoreReaderGdsImpl::ObjectStoreReaderGdsImpl( const ObjectStoreImpl& objectStore, const Options& options )
     : m_options( options )
-    , m_objects( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) )
+    , m_objects( new ObjectFileReaderGds( objectStore.getDataFile().string().c_str() ) )
     , m_index( new ObjectIndex( objectStore.getIndexFile().string().c_str(), options.pollForUpdates ) )
 {
 }
 
-ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
+ObjectStoreReaderGdsImpl::~ObjectStoreReaderGdsImpl()
 {
 }
 
-bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
+bool ObjectStoreReaderGdsImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
 {
     // Look up the key in the object metadata map.
     ObjectMetadata metadata;
@@ -64,7 +66,7 @@ bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& 
     return true;
 }
 
-bool ObjectStoreReaderImpl::find( Key key, void*& dest, size_t& resultSize )
+bool ObjectStoreReaderGdsImpl::find( Key key, void*& dest, size_t& resultSize )
 {
     // Look up the key in the object metadata map.
     ObjectMetadata metadata;
@@ -72,10 +74,11 @@ bool ObjectStoreReaderImpl::find( Key key, void*& dest, size_t& resultSize )
         return false;
 
     // Allocate storage for the object.
-    dest = new char[metadata.size];
+    CUDA_CHECK( cudaMalloc( &dest, metadata.size ) );
 
-    // // Read the object using the offset and size from the object metadata.
+    // Read the object using the offset and size from the object metadata.
     m_objects->read( metadata.offset, metadata.size, dest );
+
     resultSize = metadata.size;
     return true;
 }

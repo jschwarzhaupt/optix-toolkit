@@ -26,58 +26,28 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "ObjectStoreReaderImpl.h"
-#include "ObjectFileReader.h"
-#include "ObjectIndex.h"
-#include "ObjectStoreImpl.h"
+#pragma once
 
-#include <OptiXToolkit/Util/Exception.h>
+#include <sys/types.h>
 
-#include <filesystem>
-
-using path = std::filesystem::path;
+#include "cufile.h"
 
 namespace sceneDB {
 
-ObjectStoreReaderImpl::ObjectStoreReaderImpl( const ObjectStoreImpl& objectStore, const Options& options )
-    : m_options( options )
-    , m_objects( new ObjectFileReader( objectStore.getDataFile().string().c_str() ) )
-    , m_index( new ObjectIndex( objectStore.getIndexFile().string().c_str(), options.pollForUpdates ) )
+/** ObjectFileReaderGds encapsulates the NVIDIA GPU Direct Storage system. */
+class ObjectFileReaderGds
 {
-}
+  public:
+    ObjectFileReaderGds( const char* path );
 
-ObjectStoreReaderImpl::~ObjectStoreReaderImpl()
-{
-}
+    ~ObjectFileReaderGds();
 
-bool ObjectStoreReaderImpl::find( Key key, void* dest, size_t destSize, size_t& resultSize )
-{
-    // Look up the key in the object metadata map.
-    ObjectMetadata metadata;
-    if( !m_index->find( key, &metadata ) )
-        return false;
+    /// Read an object with the specified size from the given offset into the given buffer.
+    void read( off_t offset, size_t size, void* dest );
 
-    // Read the object using the offset and size from the object metadata.
-    OTK_ASSERT( destSize >= metadata.size );
-    resultSize = metadata.size;
-    m_objects->read( metadata.offset, metadata.size, dest );
-    return true;
-}
-
-bool ObjectStoreReaderImpl::find( Key key, void*& dest, size_t& resultSize )
-{
-    // Look up the key in the object metadata map.
-    ObjectMetadata metadata;
-    if( !m_index->find( key, &metadata ) )
-        return false;
-
-    // Allocate storage for the object.
-    dest = new char[metadata.size];
-
-    // // Read the object using the offset and size from the object metadata.
-    m_objects->read( metadata.offset, metadata.size, dest );
-    resultSize = metadata.size;
-    return true;
-}
+  private:
+    CUfileHandle_t m_handle;
+    int            m_descriptor;
+};
 
 }  // namespace sceneDB

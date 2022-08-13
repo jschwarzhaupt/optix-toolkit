@@ -44,9 +44,19 @@ class ObjectStoreReader
         /// If true, a thread is spawned that polls the filesystem for updates.
         bool pollForUpdates = true;
 
+        /// If true, reader will leverage GPU Direct Storage.
+        bool useGds = false;
+
         /// Equality operator for options.
-        bool operator==( const Options& other ) const { return pollForUpdates == other.pollForUpdates; }
+        bool operator==( const Options& other ) const 
+        { 
+          return pollForUpdates == other.pollForUpdates  
+                      && useGds == other.useGds;
+        }
     };
+
+    /// Get the options for this reader.
+    virtual const Options& getOptions() const = 0;
 
     /// The key is a 64-bit integer, which is typically a content-based address (CBA).
     using Key = uint64_t;
@@ -61,7 +71,7 @@ class ObjectStoreReader
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer (which is resized if necessary).  Thread safe.
-    virtual bool find( Key key, std::vector<char>& dest ) = 0;
+    virtual bool find( Key key, void*& dest, size_t& resultSize ) = 0;
 };
 
 }  // namespace sceneDB

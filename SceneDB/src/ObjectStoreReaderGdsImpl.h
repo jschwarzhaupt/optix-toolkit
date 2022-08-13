@@ -37,11 +37,11 @@ namespace sceneDB {
 /** ObjectStoreReader is a thread-safe reader for an ObjectStore.  The implementation reads a table
     of contents to create an index mapping each key to an object's size and offset in the object
     file.  Multiple records can then be read concurrently from the object file. */
-class ObjectStoreReaderImpl : public ObjectStoreReader
+class ObjectStoreReaderGdsImpl : public ObjectStoreReader
 {
   public:
     /// Destroy ObjectStoreReader, closing any associated files.
-    virtual ~ObjectStoreReaderImpl();
+    virtual ~ObjectStoreReaderGdsImpl();
 
     /// Find the object with the specified key.  Returns true for success, copying the object data
     /// into the given buffer and returning the object size via result parameter.  Throws an exception
@@ -59,12 +59,12 @@ class ObjectStoreReaderImpl : public ObjectStoreReader
     friend class ObjectStoreImpl;
 
     /// Use ObjectStore::getReader() to obtain an ObjectStoreReader.
-    ObjectStoreReaderImpl( const class ObjectStoreImpl& objectStore, const Options& options );
+    ObjectStoreReaderGdsImpl( const class ObjectStoreImpl& objectStore, const Options& options );
 
   private:
-    Options                                  m_options;
-    std::unique_ptr<class ObjectFileReader>  m_objects;
-    std::unique_ptr<class ObjectIndex>       m_index;
+    Options                                     m_options;
+    std::unique_ptr<class ObjectFileReaderGds>  m_objects;
+    std::unique_ptr<class ObjectIndex>          m_index;
 };
 
 }  // namespace sceneDB

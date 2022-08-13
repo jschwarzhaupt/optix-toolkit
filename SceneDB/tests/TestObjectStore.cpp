@@ -27,8 +27,11 @@
 //
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
+#include <OptiXToolkit/Util/Exception.h>
 
 #include <gtest/gtest.h>
+
+#include <cuda_runtime.h>
 
 #include <chrono>
 #include <thread>
@@ -80,9 +83,47 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     buf1[strlen( str1 )] = '\0';
     EXPECT_STREQ( str1, buf1.data() );
 
-    std::vector<char> buf2;
-    EXPECT_TRUE( reader->find( 2, buf2 ) );
-    EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
+    void* buf2 = 0;
+    size_t size2 = 0;
+    EXPECT_TRUE( reader->find( 2, buf2, size2 ) );
+    EXPECT_EQ( std::string( str2 ), std::string( static_cast<const char*>(buf2), size2 ) );
+
+    reader.reset();
+    m_store->destroy();
+}
+
+TEST_F(TestObjectStore, TestReadGpuDirectStorage)
+{
+    auto writer = m_store->getWriter();
+    const char* str1 = "Hello, world!";
+    const char* str2 = "Goodbye, cruel world.";
+    writer->insert( 1, str1, strlen( str1 ) );
+    writer->insert( 2, str2, strlen( str2 ) );
+    writer.reset();
+
+    ObjectStoreReader::Options options;
+    options.pollForUpdates = false;
+    options.useGds = true;
+    auto reader = m_store->getReader( options );
+
+    void* devptr1 = 0;
+    size_t size1 = 0;
+    const size_t str1Size = strlen( str1 );
+    CUDA_CHECK( cudaMalloc( &devptr1, str1Size ) );
+    EXPECT_TRUE( reader->find( 1, devptr1, str1Size, size1 ) );
+    std::vector<char> buf1(size1);
+    CUDA_CHECK( cudaMemcpy( reinterpret_cast<void*>(buf1.data()), devptr1, size1, cudaMemcpyDeviceToHost ) );
+    buf1[size1] = '\0';
+    EXPECT_STREQ( str1, buf1.data() ); 
+
+    void* devptr2 = 0;
+    size_t size2 = 0;
+    const size_t str2Size = strlen( str2 );
+    EXPECT_TRUE( reader->find( 2, devptr2, size2 ) );
+    std::vector<char> buf2(size2);
+    CUDA_CHECK( cudaMemcpy( reinterpret_cast<void*>(buf2.data()), devptr2, size2, cudaMemcpyDeviceToHost ) );
+    buf2[size2] = '\0';
+    EXPECT_STREQ( str2, buf2.data() );
 
     reader.reset();
     m_store->destroy();
@@ -111,12 +152,12 @@ TEST_F(TestObjectStore, TestRemove)
     buf1[strlen( str3 )] = '\0';
     EXPECT_STREQ( str3, buf1.data() );
 
-    std::vector<char> buf2;
-    EXPECT_FALSE( reader->find( 2, buf2 ) );
+    void* buf2 = 0;
+    size_t size2 = 0;
+    EXPECT_FALSE( reader->find( 2, buf2, size2 ) );
 
     reader.reset();
     m_store->destroy();
-
 }
 
 TEST_F(TestObjectStore, DISABLED_TestReaderPolling)
@@ -155,9 +196,10 @@ TEST_F(TestObjectStore, DISABLED_TestReaderPolling)
     std::this_thread::sleep_for( 100ms );
 
     // Read second object.
-    std::vector<char> buf2;
-    EXPECT_TRUE( reader->find( 2, buf2 ) );
-    EXPECT_EQ( std::string( str2 ), std::string( buf2.data(), buf2.size() ) );
+    void* buf2 = 0;
+    size_t size2 = 0;
+    EXPECT_TRUE( reader->find( 2, buf2, size2 ) );
+    EXPECT_EQ( std::string( str2 ), std::string( static_cast<const char*>(buf2), size2 ) );
 
     // Clean up.
     writer.reset();
