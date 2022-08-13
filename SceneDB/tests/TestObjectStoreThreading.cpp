@@ -49,6 +49,7 @@ struct TestParams
     size_t       fixedObjectSize;
     size_t       minObjectSize;
     size_t       maxObjectSize;
+    bool         useGds;
 };
 
 class TestObjectStoreThreading : public testing::TestWithParam<TestParams>
@@ -116,6 +117,7 @@ TEST_P(TestObjectStoreThreading, TestThreading)
     otk::Stopwatch metadataTimer;
     ObjectStoreReader::Options options;
     options.pollForUpdates = false;
+    options.useGds = params.useGds;
     ObjectReaders readers( m_store, options, objectSizes, /*validateData=*/true, params.numThreads );
 
     // Print object metadata read stats.
@@ -140,6 +142,8 @@ std::vector<TestParams> g_params{
     // numThreads, numObjects, fixedObjectSize, minObjectSize, maxObjectSize
     {1, 128, 8 * 1024, 0, 0},
     {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024},
+    {1, 128, 8 * 1024, 0, 0, true},
+    {4 * g_maxThreads, 32 * 1024, 0, 1, 32 * 1024, true},
 };
 
 INSTANTIATE_TEST_SUITE_P( ThreadingTests, TestObjectStoreThreading, testing::ValuesIn( g_params ) );

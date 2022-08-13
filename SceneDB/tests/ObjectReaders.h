@@ -31,7 +31,10 @@
 #include "ObjectMetadata.h"
 
 #include <OptiXToolkit/SceneDB/ObjectStore.h>
+#include <OptiXToolkit/Util/Exception.h>
 #include <OptiXToolkit/Util/Stopwatch.h>
+
+#include <cuda_runtime.h>
 
 #include <gtest/gtest.h>
 
@@ -52,11 +55,21 @@ class ObjectReaders
         m_threads.reserve( numThreads );
 
         // Pre-allocate an object buffer for each thread, sized to the maximum object size
-        m_buffers.resize( numThreads );
+        if( options.useGds )
+            m_deviceBuffers.resize( numThreads );
+        else
+            m_buffers.resize( numThreads );
         size_t maxObjectSize( *std::max_element( m_objectSizes.begin(), m_objectSizes.end() ) );
         for( unsigned int threadNum = 0; threadNum < numThreads; ++threadNum )
         {
-            m_buffers[threadNum].resize( maxObjectSize );
+            if( options.useGds )
+            {
+                CUDA_CHECK( cudaMalloc( &m_deviceBuffers[threadNum], maxObjectSize ) );
+            }
+            else
+            {
+                m_buffers[threadNum].resize( maxObjectSize );
+            }
         }
 
         // Create the ObjectStoreReader.
@@ -86,29 +99,58 @@ class ObjectReaders
     std::shared_ptr<sceneDB::ObjectStoreReader> m_reader;
     std::vector<std::thread>                    m_threads;
     std::vector<std::vector<char>>              m_buffers;
+    std::vector<void*>                          m_deviceBuffers; 
     std::atomic<int>                            m_nextObject = 0;
 
     void worker( unsigned int threadNum )
     {
         try
         {
+            const auto& options = m_reader->getOptions();
+
+            // Need to initalize CUDA runtime for each thread.
+            if( options.useGds )
+                CUDA_CHECK( cudaFree(0) );
+
             for( int objectNum = m_nextObject++; objectNum < m_objectSizes.size(); objectNum = m_nextObject++ )
             {
                 // Find the object using the size as the key.  The per-thread buffer has already
                 // been sized.
                 size_t size = m_objectSizes[objectNum];
-                std::vector<char>& buffer = m_buffers[threadNum];
-                size_t actualSize;
-                EXPECT_TRUE( m_reader->find( size, buffer.data(), size, actualSize ) );
-                EXPECT_EQ( size, actualSize );
+                size_t actualSize = 0;
 
-                // Optionally verify that the object was filled consistently.
-                if (m_validateData)
+                void* bufferPtr = 0;
+                if( options.useGds )
                 {
+                    bufferPtr = m_deviceBuffers[threadNum];
+                }
+                else
+                {
+                    bufferPtr = m_buffers[threadNum].data();
+                }
+
+                EXPECT_TRUE( m_reader->find( size, bufferPtr, size, actualSize ) );
+
+                if( m_validateData )
+                {
+                    std::vector<char> buffer(size);
+
+                    // For GPU Direct Storage we need to copy the object back to the host.
+                    if( options.useGds )
+                    {
+                        CUDA_CHECK( cudaMemcpy( reinterpret_cast<void*>(buffer.data()), 
+                            bufferPtr, size, cudaMemcpyDeviceToHost ) );
+                    }
+                    else
+                    {
+                        buffer = m_buffers[threadNum];
+                    }
                     char   fillValue = buffer[0];
                     size_t count     = std::count( buffer.begin(), buffer.begin() + size, fillValue );
                     EXPECT_EQ( size, count );
                 }
+
+                EXPECT_EQ( size, actualSize );
             }
         }
         catch( const std::exception& e )
