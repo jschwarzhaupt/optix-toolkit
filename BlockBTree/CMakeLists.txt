@@ -30,7 +30,7 @@
 cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 include(../CMake/Policies.cmake)
 
-project(Util LANGUAGES C CXX CUDA)
+project(BlockBTree LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -40,71 +40,59 @@ include(../CMake/BuildConfig.cmake)
 
 find_package( CUDAToolkit 11.1 REQUIRED )
 
-add_library(SceneDB SHARED
+add_library(BlockBTree SHARED
   src/AppendOnlyFile.cpp
-  src/ObjectFileReader.cpp
-  src/ObjectIndex.cpp
-  src/ObjectStoreImpl.cpp
-  src/ObjectStoreReaderImpl.cpp
-  src/ObjectStoreWriterImpl.cpp
   src/GenericTableImpl.cpp
   src/GenericTableReaderImpl.cpp
   src/GenericTableWriterImpl.cpp
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)
-  add_library(OptiXToolkit::SceneDB ALIAS SceneDB)
+  add_library(OptiXToolkit::BlockBTree ALIAS BlockBTree)
 endif()
 
-target_sources(SceneDB 
+target_sources(BlockBTree 
   PUBLIC 
   FILE_SET HEADERS 
   BASE_DIRS include
   FILES
-  include/OptiXToolkit/SceneDB/DataBlock.h
-  include/OptiXToolkit/SceneDB/GenericTable.h
-  include/OptiXToolkit/SceneDB/GenericTableReader.h
-  include/OptiXToolkit/SceneDB/GenericTableWriter.h
-  include/OptiXToolkit/SceneDB/ObjectStore.h
-  include/OptiXToolkit/SceneDB/ObjectStoreReader.h
-  include/OptiXToolkit/SceneDB/ObjectStoreWriter.h
-  include/OptiXToolkit/SceneDB/Table.h
-  include/OptiXToolkit/SceneDB/TableReader.h
-  include/OptiXToolkit/SceneDB/TableWriter.h
+  include/OptiXToolkit/BlockBTree/GenericTable.h
+  include/OptiXToolkit/BlockBTree/GenericTableReader.h
+  include/OptiXToolkit/BlockBTree/GenericTableWriter.h
+  include/OptiXToolkit/BlockBTree/Table.h
+  include/OptiXToolkit/BlockBTree/TableReader.h
+  include/OptiXToolkit/BlockBTree/TableWriter.h
   )
 
 source_group( "Header Files\\Implementation" FILES
   src/AppendOnlyFile.h
-  src/ObjectStoreImpl.h
-  src/ObjectStoreReaderImpl.h
-  src/ObjectStoreWriterImpl.h
   src/GenericTableImpl.h
   src/GenericTableReaderImpl.h
   src/GenericTableWriterImpl.h
   )
 
-target_include_directories(SceneDB PUBLIC
+target_include_directories(BlockBTree PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
-target_link_libraries(SceneDB PRIVATE
+target_link_libraries(BlockBTree PRIVATE
   OptiXToolkit::Util 
   CUDA::cudart
   )
 
-set_target_properties(SceneDB PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set_target_properties(BlockBTree PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-install(TARGETS SceneDB
-  EXPORT SceneDBTargets
+install(TARGETS BlockBTree
+  EXPORT BlockBTreeTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/OptiXToolkit
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
-install(EXPORT SceneDBTargets
-  FILE SceneDBTargets.cmake
+install(EXPORT BlockBTreeTargets
+  FILE BlockBTreeTargets.cmake
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OptiXToolkit
   NAMESPACE OptiXToolkit::
   )

@@ -67,10 +67,11 @@ install(FILES ${OptiXToolkit_BINARY_DIR}/CMake/OptiXToolkitConfig.cmake
 # Subdirectories
 
 option( OTK_BUILD_DEMAND_LOADING "Enable build of DemandLoading library" OFF )
-option( OTK_BUILD_DOCS "Enable build of OptiXToolkit documentation" ON)
+option( OTK_BUILD_DOCS "Enable build of OptiXToolkit documentation" OFF )
 option( OTK_BUILD_EXAMPLES "Enable build of OptiXToolkit examples" OFF )
 option( OTK_BUILD_GUI "Enable build of Gui library" OFF )
-option( OTK_BUILD_SCENE_DB "Enable build of SceneDB library" ON )
+option( OTK_BUILD_SCENE_DB "Enable build of SceneDB library" OFF )
+option( OTK_BUILD_BLOCK_BTREE "Enable build of BlockBTree library" ON )
 
 add_subdirectory(Util)
 
@@ -86,6 +87,10 @@ endif()
 
 if( OTK_BUILD_SCENE_DB )
   add_subdirectory(SceneDB)
+endif()
+
+if( OTK_BUILD_BLOCK_BTREE )
+  add_subdirectory(BlockBTree)
 endif()
 
 if( OTK_BUILD_EXAMPLES )
