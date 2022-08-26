@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <OptiXToolkit/SceneDB/Table.h>
+#include <OptiXToolkit/BlockBTree/Table.h>
 
 #include <gtest/gtest.h>
 

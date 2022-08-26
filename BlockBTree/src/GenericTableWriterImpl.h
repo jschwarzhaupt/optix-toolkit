@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/GenericTableWriter.h>
-#include <OptiXToolkit/SceneDB/ObjectStoreWriter.h>
+#include <OptiXToolkit/BlockBTree/GenericTableWriter.h>
+#include <OptiXToolkit/BlockBTree/DataBlock.h>
 
 #include <cstddef>
 #include <memory>
@@ -76,13 +76,13 @@ class GenericTableWriterImpl : public GenericTableWriter
     friend class GenericTableImpl;
 
     /// Use Table::getWriter() to obtain a GenericTableWriter.
-    GenericTableWriterImpl( std::shared_ptr<ObjectStoreWriter> writer, size_t keySize, size_t recordSize );
+    GenericTableWriterImpl( /*std::shared_ptr<ObjectStoreWriter> writer, */size_t keySize, size_t recordSize);
 
   private:
     size_t m_recordSize;
 
     // Interim implementation uses ObjectStoreWriter.
-    std::shared_ptr<ObjectStoreWriter> m_writer;
+    //std::shared_ptr<ObjectStoreWriter> m_writer;
 };
 
 }  // namespace sceneDB

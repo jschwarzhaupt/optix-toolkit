@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/GenericTableReader.h>
+#include <OptiXToolkit/BlockBTree/GenericTableReader.h>
 
 namespace sceneDB {
 

@@ -37,9 +37,9 @@ using path = std::filesystem::path;
 
 namespace sceneDB {
 
-GenericTableWriterImpl::GenericTableWriterImpl( std::shared_ptr<ObjectStoreWriter> writer, size_t keySize, size_t recordSize )
-    : m_writer( writer )
-    , m_recordSize( recordSize )
+GenericTableWriterImpl::GenericTableWriterImpl( /*std::shared_ptr<ObjectStoreWriter> writer,*/ size_t keySize, size_t recordSize)
+    : /*m_writer(writer)
+    , */m_recordSize( recordSize )
 {
     // Interim implementation uses ObjectStoreWriter.
     OTK_ASSERT( keySize == sizeof( uint64_t ) );
@@ -52,8 +52,8 @@ GenericTableWriterImpl::~GenericTableWriterImpl()
 bool GenericTableWriterImpl::insert( KeyPtr key, RecordPtr record )
 {
     // Kludge:
-    ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
-    return m_writer->insert(ikey, record, m_recordSize);
+    //ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
+    return false;// m_writer->insert( ikey, record, m_recordSize );
 }
 
 bool GenericTableWriterImpl::update( KeyPtr key, void* data, size_t size, size_t offset )
@@ -71,8 +71,8 @@ bool GenericTableWriterImpl::updateV( KeyPtr key, DataBlock* dataBlocks, size_t*
 void GenericTableWriterImpl::remove( KeyPtr key )
 {
     // Kludge:
-    ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
-    m_writer->remove( ikey );
+    //ObjectStoreWriter::Key ikey = *reinterpret_cast<const ObjectStoreWriter::Key*>( key );
+    //m_writer->remove( ikey );
 }
 
 std::shared_ptr<class Snapshot> GenericTableWriterImpl::takeSnapshot()
@@ -83,7 +83,7 @@ std::shared_ptr<class Snapshot> GenericTableWriterImpl::takeSnapshot()
 
 void GenericTableWriterImpl::flush()
 {
-    m_writer->flush();
+    //m_writer->flush();
 }
 
 }  // namespace sceneDB

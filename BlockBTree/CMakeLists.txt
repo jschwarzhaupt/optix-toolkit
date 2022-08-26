@@ -56,6 +56,7 @@ target_sources(BlockBTree
   FILE_SET HEADERS 
   BASE_DIRS include
   FILES
+  include/OptiXToolkit/BlockBTree/DataBlock.h
   include/OptiXToolkit/BlockBTree/GenericTable.h
   include/OptiXToolkit/BlockBTree/GenericTableReader.h
   include/OptiXToolkit/BlockBTree/GenericTableWriter.h

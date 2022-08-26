@@ -39,6 +39,7 @@
 #include <gtest/gtest.h>
 
 #include <thread>
+#include <algorithm>
 
 class ObjectReaders
 {
@@ -55,14 +56,14 @@ class ObjectReaders
         m_threads.reserve( numThreads );
 
         // Pre-allocate an object buffer for each thread, sized to the maximum object size
-        if( options.useGds )
+        if( 0 && options.useGds )
             m_deviceBuffers.resize( numThreads );
         else
             m_buffers.resize( numThreads );
         size_t maxObjectSize( *std::max_element( m_objectSizes.begin(), m_objectSizes.end() ) );
         for( unsigned int threadNum = 0; threadNum < numThreads; ++threadNum )
         {
-            if( options.useGds )
+            if( 0 && options.useGds )
             {
                 CUDA_CHECK( cudaMalloc( &m_deviceBuffers[threadNum], maxObjectSize ) );
             }
@@ -109,7 +110,7 @@ class ObjectReaders
             const auto& options = m_reader->getOptions();
 
             // Need to initalize CUDA runtime for each thread.
-            if( options.useGds )
+            if( 0 && options.useGds )
                 CUDA_CHECK( cudaFree(0) );
 
             for( int objectNum = m_nextObject++; objectNum < m_objectSizes.size(); objectNum = m_nextObject++ )
@@ -120,7 +121,7 @@ class ObjectReaders
                 size_t actualSize = 0;
 
                 void* bufferPtr = 0;
-                if( options.useGds )
+                if( 0 && options.useGds )
                 {
                     bufferPtr = m_deviceBuffers[threadNum];
                 }
@@ -136,7 +137,7 @@ class ObjectReaders
                     std::vector<char> buffer(size);
 
                     // For GPU Direct Storage we need to copy the object back to the host.
-                    if( options.useGds )
+                    if( 0 && options.useGds )
                     {
                         CUDA_CHECK( cudaMemcpy( reinterpret_cast<void*>(buffer.data()), 
                             bufferPtr, size, cudaMemcpyDeviceToHost ) );

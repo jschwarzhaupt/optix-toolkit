@@ -31,18 +31,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
+
 #ifdef WIN32
-#include <io.h>
+#include <fileapi.h>
 #else
 #include <sys/uio.h>
 #include <unistd.h>
-#endif
-
-// Prefix some symbols with underscore under Windows
-#ifdef WIN32
-#define US( x ) _##x
-#else
-#define US( x ) x
 #endif
 
 namespace sceneDB {
@@ -51,37 +45,68 @@ AppendOnlyFile::AppendOnlyFile( const char* path )
 {
     // File permissions
 #ifdef WIN32
-    int mode = _S_IREAD | _S_IWRITE;
+    m_descriptor = CreateFileA( path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr );
+    if( m_descriptor == INVALID_HANDLE_VALUE )
+    {
+        int code = GetLastError();
 #else
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
-#endif
 
     // Open file.
-    m_descriptor = US( open )( path, US( O_WRONLY ) | US( O_CREAT ) | US( O_TRUNC ), mode );
+    m_descriptor = open( path, O_WRONLY | O_CREAT | O_TRUNC, mode );
     if( m_descriptor < 0 )
     {
-        throw otk::Exception( "Cannot open AppendOnlyFile", errno );
+        int code = errno;
+#endif
+        throw otk::Exception( "Cannot open AppendOnlyFile", code );
     }
 }
 
 AppendOnlyFile::~AppendOnlyFile()
 {
-    US( close )( m_descriptor );
+#ifdef WIN32
+    CloseHandle( m_descriptor );
+#else
+    close( m_descriptor );
+#endif    
 }
 
-off_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
+AppendOnlyFile::offset_t AppendOnlyFile::appendV( const DataBlock* dataBlocks, int numDataBlocks )
 {
     // Calculate the object size.
     size_t size = sumDataBlockSizes( dataBlocks, numDataBlocks );
 
     // Reserve space for the object using an atomic add to fetch the current offset and increment
     // it by the object size.
-    off_t begin = m_offset.fetch_add( size );
+    offset_t begin = m_offset.fetch_add( size );
 
     // Write the object at the reserved offset, using pwritev() to concatenate the given data blocks.
-    ssize_t bytesWritten = ::pwritev( m_descriptor, reinterpret_cast<const ::iovec*>( dataBlocks ), numDataBlocks, begin );
+#ifdef WIN32
+    size_t total_written = 0;
+    for( int i = 0; i < numDataBlocks; ++i )
+    {
+        OTK_ASSERT_MSG( dataBlocks[ i ].size <= MAXDWORD, "Data block exceeds maximum size." );
+        OVERLAPPED ol;
+        ol.Internal = 0;
+        ol.InternalHigh = 0;
+        ol.hEvent = 0;
+        ol.Offset = begin & 0xFFFFFFFFll;
+        ol.OffsetHigh = DWORD( begin >> 32 );
+
+        DWORD bytesWritten = 0;
+        auto result = WriteFile( m_descriptor, dataBlocks[ i ].data, DWORD( dataBlocks[ i ].size ), &bytesWritten, &ol );
+        if( !result || bytesWritten != dataBlocks[ i ].size )
+        {
+            throw otk::Exception( "Error writing data to AppendOnlyFile" );
+        }
+        total_written += bytesWritten;
+    }
+    OTK_ASSERT_MSG( total_written == size, "Error writing data to AppendOnlyFile." );
+#else
+    ssize_t bytesWritten = ::pwritev( m_descriptor, reinterpret_cast< const ::iovec* >( dataBlocks ), numDataBlocks, begin );
     if( bytesWritten != size )
         throw otk::Exception( "Error writing data to AppendOnlyFile" );
+#endif    
 
     // Return the offset of the object data.
     return begin;

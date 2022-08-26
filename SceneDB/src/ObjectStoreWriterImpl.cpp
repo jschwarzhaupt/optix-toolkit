@@ -65,7 +65,7 @@ bool ObjectStoreWriterImpl::insertV( Key key, const DataBlock* dataBlocks, int n
     }
 
     // Append the object to the data file.
-    off_t offset = m_objects->appendV( dataBlocks, numDataBlocks );
+    auto offset = m_objects->appendV( dataBlocks, numDataBlocks );
     size_t size = sumDataBlockSizes( dataBlocks, numDataBlocks );
 
     // Append a record to the object metadata file specifying the key, offset, and size of the object.

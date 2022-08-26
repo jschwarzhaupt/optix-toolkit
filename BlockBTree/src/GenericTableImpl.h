@@ -31,8 +31,7 @@
 #include "GenericTableReaderImpl.h"
 #include "GenericTableWriterImpl.h"
 
-#include <OptiXToolkit/SceneDB/GenericTable.h>
-#include <OptiXToolkit/SceneDB/ObjectStore.h>
+#include <OptiXToolkit/BlockBTree/GenericTable.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -86,7 +85,7 @@ class GenericTableImpl : public GenericTable
     const std::filesystem::path& getDataFile() const { return m_dataFile; }
 
     // Interim implementation uses ObjectStore.
-    std::shared_ptr<ObjectStore> getStore() const { return m_store; }
+    //std::shared_ptr<ObjectStore> getStore() const { return m_store; }
 
   private:
     const std::string           m_tableName;
@@ -102,7 +101,7 @@ class GenericTableImpl : public GenericTable
     std::shared_ptr<GenericTableReaderImpl> m_reader;
 
     // Interim implementation uses ObjectStore.
-    std::shared_ptr<ObjectStore> m_store;
+    //std::shared_ptr<ObjectStore> m_store;
 };
 
 }  // namespace sceneDB

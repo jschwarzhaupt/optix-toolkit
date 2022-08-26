@@ -92,7 +92,7 @@ TEST_F(TestObjectStore, TestWriteAndRead)
     m_store->destroy();
 }
 
-TEST_F(TestObjectStore, TestReadGpuDirectStorage)
+/*TEST_F(TestObjectStore, TestReadGpuDirectStorage)
 {
     auto writer = m_store->getWriter();
     const char* str1 = "Hello, world!";
@@ -127,7 +127,7 @@ TEST_F(TestObjectStore, TestReadGpuDirectStorage)
 
     reader.reset();
     m_store->destroy();
-}
+}*/
 
 TEST_F(TestObjectStore, TestRemove)
 {

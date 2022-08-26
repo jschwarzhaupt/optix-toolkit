@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/DataBlock.h>
+#include <OptiXToolkit/BlockBTree/DataBlock.h>
 #include <OptiXToolkit/Util/Exception.h>
 
 #include <cstdint>

@@ -35,6 +35,11 @@
 #include <memory>
 #include <thread>
 
+#ifdef WIN32
+#include <windows.h>
+#include <fileapi.h>
+#endif
+
 namespace sceneDB {
 
 /** ObjectIndex is a map from Key to ObjectMetadata, providing the file offset and size of each object
@@ -61,7 +66,11 @@ class ObjectIndex
 
   private:
     std::unique_ptr<class ObjectMetadataMap> m_map;
-    FILE*                                    m_file;
+#ifdef WIN32
+    HANDLE                                   m_file = INVALID_HANDLE_VALUE;
+#else
+    FILE*                                    m_file = nullptr;
+#endif
     std::thread                              m_thread;
     std::atomic<bool>                        m_done            = false;
     const static int                         POLL_TIMEOUT_MSEC = 500;
@@ -72,11 +81,19 @@ class ObjectIndex
 
     void close()
     {
+#ifdef WIN32
+        if( m_file != INVALID_HANDLE_VALUE )
+        {
+            CloseHandle( m_file );
+            m_file = INVALID_HANDLE_VALUE;
+        }
+#else
         if( m_file )
         {
             fclose( m_file );
             m_file = nullptr;
         }
+#endif
     }
 };
 

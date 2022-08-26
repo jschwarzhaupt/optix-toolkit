@@ -92,6 +92,7 @@ void GenericTableImpl::close()
     std::unique_lock<std::mutex> lock( m_mutex );
     m_writer.reset();
     m_reader.reset();
+    m_store->destroy();
 }
 
 void GenericTableImpl::destroy()

@@ -30,21 +30,35 @@
 
 #include <sys/types.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 namespace sceneDB {
 
 /** ObjectFileReader simply encapsulates pread, allowing concurrent reads from an object file. */
 class ObjectFileReader
 {
   public:
+#ifdef WIN32
+    typedef long long  offset_t;
+#else
+    typedef off_t      offset_t;
+#endif
+
     ObjectFileReader( const char* path );
 
     ~ObjectFileReader();
 
     /// Read an object with the specified size from the given offset into the given buffer.
-    void read( off_t offset, size_t size, void* dest );
+    void read( offset_t offset, size_t size, void* dest );
 
   private:
-    int m_descriptor;
+#ifdef WIN32
+    HANDLE             m_descriptor;
+#else
+    int                m_descriptor;
+#endif
 };
 
 }  // namespace sceneDB

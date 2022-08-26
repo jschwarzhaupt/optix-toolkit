@@ -37,12 +37,18 @@ namespace sceneDB {
 
 struct ObjectMetadata
 {
+#ifdef WIN32
+    typedef long long  offset_t;
+#else
+    typedef off_t      offset_t;
+#endif
+
     uint64_t key;
-    off_t    offset;
+    offset_t offset;
     size_t   size;
 
     /// This invalid file offset denotes object removal.
-    static const off_t REMOVED = std::numeric_limits<off_t>::max();
+    static const offset_t REMOVED = std::numeric_limits<offset_t>::max();
 };
     
 } // namespace sceneDB

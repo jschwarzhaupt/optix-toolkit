@@ -48,13 +48,13 @@ GenericTableImpl::GenericTableImpl( const char* directory, const char* tableName
     , m_keySize( keySize )
     , m_recordSize( recordSize )
     , m_recordAlignment( recordAlignment )
-    , m_store( ObjectStore::createInstance( ObjectStore::Options{directory} ) )
+    //, m_store( ObjectStore::createInstance( ObjectStore::Options{directory} ) )
 {
 }
 
 bool GenericTableImpl::exists() const
 {
-    return m_store->exists();
+    return false;// m_store->exists();
     // TODO: return std::filesystem::exists( m_dataFile );
 }
 
@@ -70,7 +70,7 @@ std::shared_ptr<GenericTableWriter> GenericTableImpl::getWriter( std::shared_ptr
         std::filesystem::create_directory( path( m_directory ) );
 
         // Create a new writer.
-        m_writer.reset( new GenericTableWriterImpl( m_store->getWriter(), m_keySize, m_recordSize ) );
+        m_writer.reset( new GenericTableWriterImpl( /*m_store->getWriter(),*/ m_keySize, m_recordSize));
     }
 
     return m_writer;
@@ -82,7 +82,7 @@ std::shared_ptr<GenericTableReader> GenericTableImpl::getReader( std::shared_ptr
     if( !m_reader )
     {
         // Create a new reader.
-        m_reader.reset( new GenericTableReaderImpl( m_store->getReader(), m_keySize, m_recordSize ) );
+        m_reader.reset( new GenericTableReaderImpl( /*m_store->getReader(),*/ m_keySize, m_recordSize));
     }
     return m_reader;
 }

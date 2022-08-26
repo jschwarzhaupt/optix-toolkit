@@ -27,9 +27,9 @@
 //
 #pragma once
 
-#include <OptiXToolkit/SceneDB/GenericTable.h>
-#include <OptiXToolkit/SceneDB/TableWriter.h>
-#include <OptiXToolkit/SceneDB/TableReader.h>
+#include <OptiXToolkit/BlockBTree/GenericTable.h>
+#include <OptiXToolkit/BlockBTree/TableWriter.h>
+#include <OptiXToolkit/BlockBTree/TableReader.h>
 
 namespace sceneDB {
 

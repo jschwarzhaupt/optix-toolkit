@@ -92,7 +92,7 @@ class ObjectStorePerfTest
         {
             int fd = open( "/proc/sys/vm/drop_caches", O_WRONLY );
             OTK_ASSERT_MSG( fd != -1, "Must run as root to drop caches" );
-            ssize_t bytesWritten = write( fd, "3", 1 );
+            auto bytesWritten = write( fd, "3", 1 );
             OTK_ASSERT_MSG( bytesWritten == 1, "Write to drop_caches failed" );
             close( fd );
         }
@@ -130,15 +130,30 @@ class ObjectStorePerfTest
     void testObjectSize()
     {
         unsigned int numThreads = 1;
-        for( size_t size = 128; size < 1024; size += 128 )
+        for( size_t size = 128; size < 4 * 128; size += 128 )
         {
             // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
             run( Params{numThreads, 100000, size, false, false} );
         }
-        for( size_t size = 1024; size <= 16 * 1024; size += 512 )
+        for( size_t size = 512; size < 4 * 512; size += 512 )
         {
             // Params: numThreads, numObjects, objectSize
             run( Params{numThreads, 100000, size, false, false} );
+        }
+        for( size_t size = 2048; size < 4 * 2048; size += 2048 )
+        {
+            // Params: numThreads, numObjects, objectSize
+            run( Params{ numThreads, 100000, size, false, false } );
+        }
+        for( size_t size = 8192; size < 4 * 8192; size += 8192 )
+        {
+            // Params: numThreads, numObjects, objectSize
+            run( Params{ numThreads, 100000, size, false, false } );
+        }
+        for( size_t size = 32768; size < 4 * 32768; size += 32768 )
+        {
+            // Params: numThreads, numObjects, objectSize
+            run( Params{ numThreads, 100000, size, false, false } );
         }
     }
 
@@ -162,6 +177,26 @@ class ObjectStorePerfTest
         }
     }
 
+    // Test 64K object throughput vs. thread count.
+    void testThreads64K()
+    {
+        for( unsigned int numThreads = 1; numThreads <= static_cast< unsigned int >( 1.5f * m_maxThreads ); ++numThreads )
+        {
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{ numThreads, 100000, 64 * 1024, false, false } );
+        }
+    }
+    
+    // Test 256K object throughput vs. thread count.
+    void testThreads256K()
+    {
+        for( unsigned int numThreads = 1; numThreads <= static_cast< unsigned int >( 1.5f * m_maxThreads ); ++numThreads )
+        {
+            // Params: numThreads, numObjects, objectSize, pollForUpdates, dropCaches
+            run( Params{ numThreads, 100000, 256 * 1024, false, false } );
+        }
+    }
+
     // Test filesystem cache exhaustion.
     void testFilesystemCache()
     {
@@ -179,7 +214,9 @@ int main()
     ObjectStorePerfTest("object size.csv", false).testObjectSize();
     ObjectStorePerfTest("threading with 4K objects.csv", false).testThreads4K();
     ObjectStorePerfTest("threading with 12K objects.csv", false).testThreads12K();
-    ObjectStorePerfTest("filesystem cache.csv", false).testFilesystemCache();
+    ObjectStorePerfTest("threading with 64K objects.csv", false ).testThreads64K();
+    ObjectStorePerfTest("threading with 256K objects.csv", false ).testThreads256K();
+    //ObjectStorePerfTest("filesystem cache.csv", false).testFilesystemCache();
 
     // Measure GDS
     // ObjectStorePerfTest("object size GDS.csv", true).testObjectSize();

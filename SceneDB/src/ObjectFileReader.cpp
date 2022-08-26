@@ -35,42 +35,97 @@
 #include <filesystem>
 
 #ifdef WIN32
-#include <io.h>
+#include <fileapi.h>
 #else
 #include <unistd.h>
-#endif
-
-// Prefix some symbols with underscore under Windows
-#ifdef WIN32
-#define US( x ) _##x
-#else
-#define US( x ) x
 #endif
 
 namespace sceneDB {
 
 ObjectFileReader::ObjectFileReader( const char* path )
 {
-    m_descriptor = US( open )( path, US( O_RDONLY ) );
+    // File permissions
+#ifdef WIN32
+    m_descriptor = CreateFileA( path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
+    if( m_descriptor == INVALID_HANDLE_VALUE )
+    {
+        int code = GetLastError();
+#else
+    // Open file.
+    m_descriptor = open( path, O_RDONLY );
     if( m_descriptor < 0 )
     {
-        throw otk::Exception( "Cannot open AppendOnlyFile", errno );
+        int code = errno;
+#endif
+        throw otk::Exception( "Cannot open ObjectFile", code );
     }
 }
 
 ObjectFileReader::~ObjectFileReader()
 {
+#ifdef WIN32
+    CloseHandle( m_descriptor );
+#else
     close( m_descriptor );
+#endif   
 }
 
-void ObjectFileReader::read( off_t offset, size_t size, void* dest )
+namespace {
+
+void completionRoutine( DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped )
+{
+    size_t expected = *( size_t* )( lpOverlapped->hEvent );
+    if( dwErrorCode != 0 || dwNumberOfBytesTransfered != DWORD( expected ) )
+        throw otk::Exception( "read() call failed in ObjectFileReader", dwErrorCode );
+}
+
+}
+
+void ObjectFileReader::read( ObjectFileReader::offset_t offset, size_t size, void* dest )
 {
     // We assume system calls are automatically restarted when interrupted (sigacation SA_RESTART).
+    int code = 0;
+#ifdef WIN32
+    offset_t bytesRead = 0;
+    offset_t _size = size;
+    do
+    {
+        DWORD _bytesRead = 0;
+        DWORD _bytesToRead = std::min<offset_t>( _size, MAXDWORD );
+
+        OVERLAPPED ol;
+        ol.Internal = 0;
+        ol.InternalHigh = 0;
+        ol.Offset = offset & 0xFFFFFFFFll;
+        ol.OffsetHigh = DWORD( offset >> 32 );
+        ol.hEvent = ( HANDLE )( &_bytesToRead );
+
+        auto result = ReadFileEx( m_descriptor, (char*)(dest) + bytesRead, _bytesToRead, &ol, ( LPOVERLAPPED_COMPLETION_ROUTINE )( completionRoutine ) );
+        if( !result )
+        {
+            bytesRead = -1;
+            code = GetLastError();
+            break;
+        }
+        auto asyncResult = SleepEx( INFINITE, true );
+        if( asyncResult != WAIT_IO_COMPLETION )
+        {
+            bytesRead = -1;
+            code = asyncResult;
+        }
+
+        bytesRead += _bytesToRead;
+        _size     -= _bytesToRead;
+        offset    += _bytesToRead;
+    } while( _size > 0 );
+#else
     ssize_t bytesRead = pread( m_descriptor, dest, size, offset );
+    code = errno;
+#endif
     if( bytesRead < 0 )
-        throw otk::Exception( "pread() call failed in ObjectFileReader", errno );
+        throw otk::Exception( "read() call failed in ObjectFileReader", code );
     else if( bytesRead != size )
-        throw otk::Exception( "Incomplete pread() call in ObjectFileReader" );
+        throw otk::Exception( "Incomplete read() call in ObjectFileReader" );
 }
 
 } // namespace sceneDB

@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/GenericTableReader.h>
-#include <OptiXToolkit/SceneDB/ObjectStoreReader.h>
+#include <OptiXToolkit/BlockBTree/GenericTableReader.h>
 
 #include <memory>
 
@@ -56,13 +55,13 @@ class GenericTableReaderImpl : public GenericTableReader
     friend class GenericTableImpl;
 
     /// Use GenericTable::getReader() to obtain an GenericTableReader.
-    GenericTableReaderImpl( std::shared_ptr<ObjectStoreReader> reader, size_t keySize, size_t recordSize );
+    GenericTableReaderImpl( /*std::shared_ptr<ObjectStoreReader> reader,*/ size_t keySize, size_t recordSize);
 
   private:
     size_t m_recordSize;
 
     // Interim implementation uses ObjectStoreReader.
-    std::shared_ptr<ObjectStoreReader> m_reader;
+    //std::shared_ptr<ObjectStoreReader> m_reader;
 };
 
 }  // namespace sceneDB

@@ -28,11 +28,15 @@
 
 #pragma once
 
-#include <OptiXToolkit/SceneDB/DataBlock.h>
+#include <OptiXToolkit/BlockBTree/DataBlock.h>
 
 #include <atomic>
 #include <cstddef>
 #include <sys/types.h>
+
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 namespace sceneDB {
 
@@ -42,6 +46,12 @@ namespace sceneDB {
 class AppendOnlyFile
 {
   public:
+#ifdef WIN32
+      typedef long long  offset_t;
+#else
+      typedef off_t      offset_t;
+#endif
+
     /// Construct AppendOnlyFile, creating or overwriting the specified file.  Throws an exception
     /// if an error occurs.
     explicit AppendOnlyFile( const char* path );
@@ -52,11 +62,11 @@ class AppendOnlyFile
     /// Append the data from the given data blocks, which are specified by structs containing a data
     /// pointer and size.  Returns the file offset of the data. Thread safe. Throws an exception if
     /// an error occurs.
-    off_t appendV( const DataBlock* dataBlocks, int numDataBlocks );
+    offset_t appendV( const DataBlock* dataBlocks, int numDataBlocks );
 
     /// Append the given data.  Returns the file offset of the data. Thread safe. Throws an
     /// exception if an error occurs.
-    off_t append( const void* data, size_t size )
+    offset_t append( const void* data, size_t size )
     {
         DataBlock dataBlock{data, size};
         return appendV( &dataBlock, 1 );
@@ -73,8 +83,14 @@ class AppendOnlyFile
     AppendOnlyFile& operator=(const AppendOnlyFile&) = delete;
 
   private:
+
+#ifdef WIN32
+    HANDLE             m_descriptor;
+#else
     int                m_descriptor;
-    std::atomic<off_t> m_offset{0};
+#endif
+
+    std::atomic<offset_t> m_offset{0};
 };
 
 }  // namespace sceneDB

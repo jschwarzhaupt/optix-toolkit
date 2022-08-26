@@ -32,8 +32,14 @@
 
 #include <cstdint>
 #include <mutex>
-#include <poll.h>
 #include <unordered_map>
+
+#ifdef WIN32
+#include <fileapi.h>
+#include <chrono>
+#else
+#include <poll.h>
+#endif
 
 namespace sceneDB {
 
@@ -88,10 +94,18 @@ class LockingObjectMetadataMap : public ObjectMetadataMap
 
 ObjectIndex::ObjectIndex( const char* filename, bool pollForUpdates )
     : m_map( pollForUpdates ? new LockingObjectMetadataMap : new ObjectMetadataMap )
-    , m_file( fopen( filename, "rb" ) )
 {
+#ifdef WIN32
+    m_file = CreateFileA( filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr );
+    if( m_file == INVALID_HANDLE_VALUE )
+    {
+#else
+    m_file = fopen( filename, "rb" );
     if( m_file == nullptr )
+    {
+#endif
         throw otk::Exception( ( std::string( "Error opening object metadata file: " ) + filename ).c_str() );
+    }
 
     // Read the metadata file, up to EOF.
     readFile();
@@ -123,6 +137,33 @@ bool ObjectIndex::find( Key key, ObjectMetadata* result ) const
     return m_map->find( key, result );
 }
 
+#ifdef WIN32
+static void pollFile( HANDLE fd, LARGE_INTEGER& old_size )
+{
+    size_t wait = 10;
+    size_t total_wait = wait;
+    const size_t max_wait = 500;
+
+    do
+    {
+        LARGE_INTEGER new_size;
+        new_size.QuadPart = 0;
+
+        OTK_ASSERT_MSG( GetFileSizeEx( fd, &new_size ), "Error polling object index file size." );
+
+        if( new_size.QuadPart > old_size.QuadPart )
+        {
+            old_size = new_size;
+            return;
+        }
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( wait ) );
+        wait *= 2;
+        total_wait += wait;
+    }
+    while( total_wait < max_wait );
+}
+#else
 static void pollFile( int fd )
 {
     ::pollfd pollfd{};
@@ -134,17 +175,24 @@ static void pollFile( int fd )
     OTK_ASSERT( !( pollfd.revents & POLLERR ) );
     OTK_ASSERT( !( pollfd.revents & POLLNVAL ) );
 }
+#endif
 
 
 // Read the object metadata file, blocking to poll when EOF is encountered.
 void ObjectIndex::reader()
 {
+    LARGE_INTEGER file_size;
+
     while( !m_done )
     {
         bool success = readRecord();
         if( !success )
         {
+#ifdef WIN32
+            pollFile( m_file, file_size );
+#else
             pollFile( ::fileno( m_file ) );
+#endif
         }
     }
 }
@@ -162,10 +210,20 @@ bool ObjectIndex::readRecord()
 {
     // Read one ObjectMetadata
     ObjectMetadata metadata;
-    size_t         itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, m_file );
+#ifdef WIN32
+    DWORD bytesRead = 0;
+    bool result = ReadFile( m_file, &metadata, sizeof( ObjectMetadata ), &bytesRead, NULL );
+    DWORD itemsRead = bytesRead / sizeof( ObjectMetadata );
+#else
+    size_t itemsRead = fread( &metadata, sizeof( ObjectMetadata ), 1, m_file );
+#endif
     if( itemsRead < 1 )
     {
+#ifdef WIN32
+        if( !result )
+#else
         if( ferror( m_file ) )
+#endif
             throw otk::Exception( "Error reading object metadata file" );
         else
             return false;  // EOF
@@ -181,6 +239,7 @@ bool ObjectIndex::readRecord()
         // Map key to ObjectMetadata.
         m_map->insert( metadata.key, metadata );
     }
+
     return true;
 }
 
