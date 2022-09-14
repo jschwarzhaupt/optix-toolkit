@@ -189,10 +189,8 @@ private:
 
 #ifdef WIN32
     HANDLE              m_file;
-    typedef long long   offset_t;
 #else
     int                 m_file;
-    typedef off_t       offset_t;
 #endif
 
     std::map<size_t, std::shared_ptr<DataBlock>>        m_writeBlocks;
