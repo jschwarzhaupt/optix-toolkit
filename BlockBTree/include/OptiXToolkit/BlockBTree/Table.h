@@ -37,6 +37,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <algorithm>
 
 namespace sceneDB {
 
@@ -74,13 +75,13 @@ struct Snapshot
         , m_modifiedBlocks( std::move( o.m_modifiedBlocks ) )
     {
         o.m_snapshotId = ~0ull;
-        o.m_rootIndex  = ~0ull;
-    }    
+        o.m_rootIndex = ~0ull;
+    }
 
     void setId( const size_t id ) { m_snapshotId = id; }
     void setRoot( const size_t root ) { m_rootIndex = root; }
 
-    bool is_new( const size_t index )      { return m_newBlocks.count( index ) != 0; }
+    bool is_new( const size_t index ) { return m_newBlocks.count( index ) != 0; }
     bool is_modified( const size_t index ) { return m_modifiedBlocks.count( index ) != 0; }
 
     size_t           m_snapshotId;
@@ -94,18 +95,18 @@ bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshotId 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class Table
 {
-    static constexpr size_t key_size         = sizeof( Key );
-    static constexpr size_t record_size      = sizeof( Record );
+    static constexpr size_t key_size = sizeof( Key );
+    static constexpr size_t record_size = sizeof( Record );
     static constexpr size_t record_alignment = alignof( Record );
 
 public:
     struct Node
     {
-        static constexpr size_t leaf_bit    = size_t( 1 ) << ( sizeof( size_t ) * 8 - 1 );
-        static constexpr size_t local_bit   = leaf_bit >> 1;
-        static constexpr size_t data_mask   = ~( leaf_bit | local_bit );
-        static constexpr size_t local_mask  = make_mask( BlockSize );
-        static constexpr size_t block_mask  = data_mask & ~local_mask;
+        static constexpr size_t leaf_bit = size_t( 1 ) << ( sizeof( size_t ) * 8 - 1 );
+        static constexpr size_t local_bit = leaf_bit >> 1;
+        static constexpr size_t data_mask = ~( leaf_bit | local_bit );
+        static constexpr size_t local_mask = make_mask( BlockSize );
+        static constexpr size_t block_mask = data_mask & ~local_mask;
         static constexpr size_t block_shift = get_msb( BlockSize );
         static constexpr size_t block_limit = ( block_mask >> block_shift ) + 1;
 
@@ -128,10 +129,16 @@ public:
             }
             Link( const Link& o ) : m_link( o.m_link ) {}
 
-            bool isValid() const { return !(m_link ^ size_t( -1 )); }
+            Link& operator=( const Link& o )
+            {
+                m_link = o.m_link;
+                return *this;
+            }
 
-            bool isLeaf() const  { return m_link & leaf_bit; }
-            void setLeaf( bool l ) 
+            bool isValid() const { return !( m_link ^ size_t( -1 ) ); }
+
+            bool isLeaf() const { return m_link & leaf_bit; }
+            void setLeaf( bool l )
             {
                 if( l )
                     m_link |= leaf_bit;
@@ -165,10 +172,43 @@ public:
             size_t m_link{ -1 };
         };
 
-        bool isLeaf()  const { return m_pairs[ B - 1 ].second.isLeaf(); }
-        bool isValid() const { return m_pairs[ B - 1 ].second.isValid(); }
+        Node()
+        {
+            side_link().first = Key( 0 );
+        }
 
-        std::pair< Key, Link > m_pairs[ B ];
+        typedef std::pair< Key, Link > Pair_T;
+
+        Pair_T& side_link() { return m_pairs[ B - 1 ]; }
+
+        bool isLeaf()  const { return side_link().second.isLeaf(); }
+        bool isValid() const { return side_link().second.isValid(); }
+        bool isFull()  const { return m_validCount + 1 == B; }
+
+        Pair_T& find( const Key& key )
+        {
+            Pair_T* it = std::lower_bound( m_pairs, m_pairs + m_validCount, key,
+                                           []( const Pair_T& e, const Key& c ) {
+                                               return e.first < c;
+                                           } );
+            if( it - m_pairs )
+                return *( it - 1 );
+            return *it;
+        }
+
+        bool tryLatch()
+        {
+            return m_latch.compare_exchange_weak( false, true );
+        }
+
+        void unlatch()
+        {
+            m_latch.store( false );
+        }
+
+        Pair_T   m_pairs[ B ];
+        uint16_t m_validCount{ 0 };
+        std::atomic<bool> m_latch{ false };
     };
 
     typedef TableWriter<Key, Record, B, BlockSize, BlockAlignment> TableWriterType;
@@ -218,7 +258,7 @@ public:
     /// readers should be destroyed before calling destroy().
     void destroy();
 
-    const std::filesystem::path& getDataFile() const     { return m_dataFileName; }
+    const std::filesystem::path& getDataFile() const { return m_dataFileName; }
     const std::filesystem::path& getSnapshotFile() const { return m_snapshotFileName; }
 
 private:
@@ -232,9 +272,9 @@ private:
             const Header* h = dynamic_cast< const Header* >( header );
             OTK_ASSERT( h );
 
-            return m_keySize    == h->m_keySize &&
-                   m_recordSize == h->m_recordSize &&
-                   BlockFile::Header::check( header );
+            return m_keySize == h->m_keySize &&
+                m_recordSize == h->m_recordSize &&
+                BlockFile::Header::check( header );
         }
 
         virtual size_t getSize() const override final
@@ -247,15 +287,15 @@ private:
             size_t* _buf = ( size_t* )buf;
             _buf[ 0 ] = m_keySize;
             _buf[ 1 ] = m_recordSize;
-            BlockFile::Header::serialize( ( char* )( buf ) + 2 * sizeof( size_t ) );
+            BlockFile::Header::serialize( ( char* )( buf )+2 * sizeof( size_t ) );
         }
 
         virtual void deserialize( void* buf ) override final
         {
             size_t* _buf = ( size_t* )buf;
-            m_keySize    = _buf[ 0 ];
+            m_keySize = _buf[ 0 ];
             m_recordSize = _buf[ 1 ];
-            BlockFile::Header::deserialize( ( char* )( buf ) + 2 * sizeof( size_t ) );
+            BlockFile::Header::deserialize( ( char* )( buf )+2 * sizeof( size_t ) );
         }
 
         virtual std::unique_ptr<BlockFile::Header> getInstance() const override final
@@ -287,6 +327,12 @@ private:
 };
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+bool operator==( const Table<Key, Record, B, BlockSize, BlockAlignment>::Node::Link& a, const Table<Key, Record, B, BlockSize, BlockAlignment>::Node::Link& b )
+{
+    return a.m_link == b.m_link;
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TableWriter
 {
     static constexpr size_t key_size    = sizeof( Key );
@@ -294,7 +340,9 @@ class TableWriter
 
 public:
     typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
-    typedef typename TableType::Node Node;
+    typedef typename TableType::Node         Node;
+    typedef typename TableType::Node::Link   Link;
+    typedef typename TableType::Node::Pair_T Pair_T;
 
 private:
     class TableDataBlock
@@ -319,31 +367,31 @@ private:
             snapshot_id() = snapshot.m_snapshotId;
         }
 
-        Node& root() { return *node_ptr( 0 ); }
-        const Node& root() const { return *node_ptr( 0 ); }
+        Node* root() { return node_ptr( 0 ); }
+        const Node* root() const { return node_ptr( 0 ); }
 
-        Node& node( const size_t offset ) { OTK_ASSERT( offset < next_node() ); return *node_ptr( offset ); }
-        const Node& node( const size_t offset ) const { OTK_ASSERT( offset < next_node() ); return *node_ptr( offset ); }
+        Node* node( const size_t offset ) { OTK_ASSERT( offset < next_node() ); return node_ptr( offset ); }
+        const Node* node( const size_t offset ) const { OTK_ASSERT( offset < next_node() ); return node_ptr( offset ); }
 
-        std::pair< Node&, size_t > get_next_node()
+        std::pair< Node*, size_t > get_next_node()
         {
             OTK_ASSERT( bytes_free() > sizeof( Node ) );
             size_t offset = next_node();
             next_node() += sizeof( Node );
             new ( ptr() + offset ) Node();
-            return std::make_pair( *node_ptr( offset ), offset );
+            return std::make_pair( node_ptr( offset ), offset );
         }
 
         Record& record( const size_t offset ) { OTK_ASSERT( offset >= next_record() ); return *record_ptr( offset ); }
         const Record& record( const size_t offset ) const { OTK_ASSERT( offset >= next_record() ); return *record_ptr( offset ); }
 
-        std::pair< Record&, size_t > get_next_record()
+        std::pair< Record*, size_t > get_next_record()
         {
             OTK_ASSERT( bytes_free() > record_size );
             size_t offset = next_record();
             next_record() -= record_size;
             new ( ptr() + offset ) Record();
-            return std::make_pair( *record_ptr( offset ), offset );
+            return std::make_pair( record_ptr( offset ), offset );
         }
 
         static constexpr size_t size() { return BlockSize; }
@@ -358,8 +406,6 @@ private:
         static constexpr size_t snap_id_offset() { return next_record_offset() - sizeof( std::size_t ); }
 
         char* ptr() { return ( char* )( m_dataBlock->get_data() ); }
-
-        size_t record_index( size_t index ) { OTK_ASSERT( index < next_record() ); }  // FIXME: no return value
 
         std::atomic_size_t* next_node_ptr() { return ( std::atomic_size_t* )( ptr() + next_node_offset() ); }
         std::atomic_size_t* next_record_ptr() { return ( std::atomic_size_t* )( ptr() + next_record_offset() ); }
@@ -393,8 +439,84 @@ public:
 
     void Insert( const Key& key, const Record& record )
     {
-        TableDataBlock root = get_root();
-        Node& node = root.root();
+        Link current = get_root_link();
+        Link parent  = get_root_link();
+        
+        TableDataBlock curr_block = get_block( current.getBlock() );
+        do
+        {
+            Node* curr_node = curr_block.node( current.getLocalAddress() );
+
+            // Traverse side links.
+            while( curr_node->side_link().first && key >= curr_node->side_link().first )
+            {
+                if( current.getBlock() != curr_node->side_link().second.getBlock() )
+                    curr_block = get_block( curr_node->side_link().second.getBlock() );
+
+                current = curr_node->side_link().second;
+                curr_node = curr_block.node( current.getLocalAddress() );
+            }
+
+            if( curr_node->isFull() )
+                if( current == parent &&
+                    current != get_root_link() )
+                {
+                    current = parent = get_root_link();
+                }
+
+            if( curr_node->isFull() || curr_node->isLeaf() )
+            {
+                if( !curr_node->tryLatch() )
+                {
+                    if( current.getBlock() != parent.getBlock() )
+                        curr_block = get_block( parent.getBlock() );
+                    current = parent;
+                    continue;
+                }
+            }
+
+            if( curr_node->isFull() )
+            {
+                bool result = trySplitAndUpdateParent( current, parent );
+                if( result == true && !curr_node->isLeaf() )
+                    curr_node->unlatch();
+                else if( result == parent_full || result == unknown )
+                {
+                    curr_node->unlatch();
+                    if( current.getBlock() != parent.getBlock() )
+                        curr_block = get_block( parent.getBlock() );
+                    current = parent;
+                    continue;
+                }
+            }
+
+            const Pair_T& pair = curr_node->find( key );
+
+            if( curr_node->isLeaf() )
+            {
+                if( pair.first != key )
+                {
+                    auto new_pair = curr_block.get_next_record();
+                    *new_pair.first = record;
+                    curr_node->insert( Pair_T( key, Link( true, true, current.getBlock(), new_pair.second ) ) );
+                }
+
+                curr_node->unlatch();
+            }
+            else
+            {
+                OTK_ASSERT( pair.second.isValid() );
+                OTK_ASSERT( !pair.second.isLeaf() );
+                OTK_ASSERT( pair.first < key );
+
+                if( current.getBlock() != pair.second.getBlock() )
+                    curr_block = get_block( pair.second.getBlock() );
+
+                current = pair.second;
+            }
+        } while( !current.isLeaf() );
+        //current = parent = root.root();
+        //if( node. )
         // Get Root block.
         // Traverse to leaf.
         // If node full, split.
@@ -455,7 +577,7 @@ private:
         return new_block;
     }
 
-    TableDataBlock get_root()
+    TableDataBlock get_root_block()
     {
         if( !m_dataFile->exists( m_currentSnapshot.m_rootIndex ) )
         {
@@ -471,6 +593,27 @@ private:
         return TableDataBlock( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_rootIndex ) );
     }
 
+    Link get_root_link()
+    {
+        if( !m_root_link.isValid() )
+        {
+            TableDataBlock root_block = get_root_block();
+            const Node& root_node = root_block.root();
+
+            m_root_link.setLocal( false );
+            m_root_link.setBlock( m_currentSnapshot.m_rootIndex );
+            m_root_link.setLocalAddress( 0 );
+
+            if( root_node.isValid() )
+                m_root_link.setLeaf( root_node.isLeaf() );
+            else
+                m_root_link.setLeaf( true ); // This only happens for the first root node created, which is always a leaf at first.
+        }
+
+        return m_root_link;
+    }
+
+    Link                         m_root_link;
     Snapshot                     m_currentSnapshot;
     std::shared_ptr< BlockFile > m_dataFile;
     std::mutex                   m_mutex;
