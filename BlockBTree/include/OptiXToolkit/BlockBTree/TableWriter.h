@@ -32,12 +32,12 @@
 
 namespace sceneDB {
 
-template <typename Key, class Record>
+template <typename Key, class Record, class Snapshot, size_t B, size_t BlockSize, size_t BlockAlignment>
 class Table;  // forward declaration
 
 /** TableWriter is a templated wrapper for GenericTableWriter.  It is used to insert fixed-sized
     records into a Table, associating them with keys of arbitrary (fixed) size.  */
-template <typename Key, class Record>
+template <typename Key, class Record, class Snapshot, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TableWriter
 {
   public:

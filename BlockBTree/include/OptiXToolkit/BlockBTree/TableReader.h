@@ -33,7 +33,7 @@
 namespace sceneDB {
 
 /** TableReader is a templated wrapper for GenericTableReader. */
-template<typename Key, class Record>
+template<typename Key, class Record, class Snapshot, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TableReader
 {
   public:

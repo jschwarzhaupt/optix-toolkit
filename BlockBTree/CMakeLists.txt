@@ -41,10 +41,8 @@ include(../CMake/BuildConfig.cmake)
 find_package( CUDAToolkit 11.1 REQUIRED )
 
 add_library(BlockBTree SHARED
-  src/AppendOnlyFile.cpp
-  src/GenericTableImpl.cpp
-  src/GenericTableReaderImpl.cpp
-  src/GenericTableWriterImpl.cpp
+  src/BlockFile.cpp
+  src/SimpleFile.cpp
   )
 
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -57,19 +55,9 @@ target_sources(BlockBTree
   BASE_DIRS include
   FILES
   include/OptiXToolkit/BlockBTree/DataBlock.h
-  include/OptiXToolkit/BlockBTree/GenericTable.h
-  include/OptiXToolkit/BlockBTree/GenericTableReader.h
-  include/OptiXToolkit/BlockBTree/GenericTableWriter.h
+  include/OptiXToolkit/BlockBTree/BlockFile.h
+  include/OptiXToolkit/BlockBTree/SimpleFile.h
   include/OptiXToolkit/BlockBTree/Table.h
-  include/OptiXToolkit/BlockBTree/TableReader.h
-  include/OptiXToolkit/BlockBTree/TableWriter.h
-  )
-
-source_group( "Header Files\\Implementation" FILES
-  src/AppendOnlyFile.h
-  src/GenericTableImpl.h
-  src/GenericTableReaderImpl.h
-  src/GenericTableWriterImpl.h
   )
 
 target_include_directories(BlockBTree PUBLIC
