@@ -159,7 +159,7 @@ public:
             void setBlock( size_t b )
             {
                 OTK_ASSERT( b < block_limit );
-                m_link = ( m_link & ~block_mask ) | ( v << block_shift );
+                m_link = ( m_link & ~block_mask ) | ( b << block_shift );
             }
 
             size_t m_link{ -1 };
@@ -359,7 +359,7 @@ private:
 
         char* ptr() { return ( char* )( m_dataBlock->get_data() ); }
 
-        size_t record_index( size_t index ) { OTK_ASSERT( index < next_record() ); }
+        size_t record_index( size_t index ) { OTK_ASSERT( index < next_record() ); }  // FIXME: no return value
 
         std::atomic_size_t* next_node_ptr() { return ( std::atomic_size_t* )( ptr() + next_node_offset() ); }
         std::atomic_size_t* next_record_ptr() { return ( std::atomic_size_t* )( ptr() + next_record_offset() ); }
@@ -395,7 +395,6 @@ public:
     {
         TableDataBlock root = get_root();
         Node& node = root.root();
-        if( node. )
         // Get Root block.
         // Traverse to leaf.
         // If node full, split.
@@ -547,12 +546,13 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::initSnapshots()
 
                 snapshot->setId( id );
                 snapshot->setRoot( rt );
-                snapshot->m_newBlocks.assign( in_data.begin(), in_data.begin() + nc );
-                snapshot->m_modifiedBlocks.assign( in_data.begin() + nc, in_data.begin() + nc + mc );
+                std::copy( in_data.begin(), in_data.begin() + nc,
+                           std::inserter( snapshot->m_newBlocks, snapshot->m_newBlocks.end() ) );
+                std::copy( in_data.begin() + nc, in_data.begin() + nc + mc,
+                           std::inserter( snapshot->m_modifiedBlocks, snapshot->m_modifiedBlocks.end() ) );
+                m_readers.insert( {snapshot, nullptr} );
 
-                m_readers.insert( { snapshot, nullptr } );
-
-                if( !m_latestSnapshot || *m_latestSnapshot < snapshot )
+                if( !m_latestSnapshot || *m_latestSnapshot < *snapshot )
                     m_latestSnapshot = snapshot;
 
                 snapshotCount--;
@@ -593,10 +593,12 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
         m_snapshotFile->write( &snapHead, 5 * sizeof( size_t ), curOffset );
         curOffset += 5 * sizeof( size_t );
 
-        m_snapshotFile->write( snap->m_newBlocks.data(), nc * sizeof( size_t ), curOffset );
+        std::vector<size_t> blocks( snap->m_newBlocks.begin(), snap->m_newBlocks.end() );
+        m_snapshotFile->write( blocks.data(), blocks.size() * sizeof( size_t ), curOffset );
         curOffset += nc * sizeof( size_t );
 
-        m_snapshotFile->write( snap->m_modifiedBlocks.data(), mc * sizeof( size_t ), curOffset );
+        blocks.assign( snap->m_modifiedBlocks.begin(), snap->m_modifiedBlocks.end() );
+        m_snapshotFile->write( blocks.data(), blocks.size() * sizeof( size_t ), curOffset );
         curOffset += mc * sizeof( size_t );
     }
 }

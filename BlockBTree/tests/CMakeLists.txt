@@ -30,8 +30,6 @@ include( ../../CMake/FetchGtest.cmake )
 
 add_executable( testBlockBTree
   main.cpp
-  TestAppendOnlyFile.cpp
-  TestTable.cpp
   )  
 
 target_include_directories( testBlockBTree PUBLIC

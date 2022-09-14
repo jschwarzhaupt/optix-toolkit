@@ -81,7 +81,7 @@ SimpleFile::SimpleFile( const std::filesystem::path& path, const bool request_wr
 
     // Try to open file for writing, if requested.
     // Check that we can flock() the file exclusively. If not, then open read-only.
-    m_file = open( path, (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
+    m_file = open( path.c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
     if( m_file < 0 )
     {
         int code = errno;
@@ -179,7 +179,7 @@ void SimpleFile::write( void* buffer, size_t size, offset_t offset ) const
     }
 #else
     auto result = pwrite( m_file, buffer, size, offset );
-    if( result != size_in_bytes )
+    if( result != size )
     {
         throw otk::Exception( "Error writing to file." );
     }

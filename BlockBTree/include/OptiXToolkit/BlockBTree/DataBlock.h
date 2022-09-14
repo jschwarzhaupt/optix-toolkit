@@ -37,6 +37,8 @@
 #include <malloc.h>
 #endif
 
+#include <cstring>  // for memcpy
+
 namespace sceneDB {
 
 /** A Block bundles a data pointer and size, plus validity. */

@@ -31,6 +31,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <vector>
 
 #ifdef WIN32
 #include <fileapi.h>
@@ -87,7 +88,7 @@ BlockFile::BlockFile( const std::filesystem::path& path,
 
     // Try to open file for writing, if requested.
     // Check that we can flock() the file exclusively. If not, then open read-only.
-    m_file = open( path, (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
+    m_file = open( path.c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
     if( m_file < 0 )
     {
         int code = errno;
@@ -578,7 +579,7 @@ void BlockFile::writeBlock( std::shared_ptr<DataBlock> block )
     }
 #else
     auto result = pwrite( m_file, block->get_data(), m_blockSize, offset );
-    if( result != size_in_bytes )
+    if( result != m_blockSize )
     {
         throw otk::Exception( "BlockFile error writing to file." );
     }
