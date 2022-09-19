@@ -146,7 +146,7 @@ void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
 #endif
 }
 
-void SimpleFile::write( void* buffer, size_t size, offset_t offset ) const
+void SimpleFile::write( const void* buffer, size_t size, offset_t offset ) const
 {
     std::lock_guard guard( m_mutex );
 
