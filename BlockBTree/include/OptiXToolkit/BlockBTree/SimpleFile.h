@@ -67,7 +67,7 @@ public:
     /// Write 'size' bytes of data to the file from 'buffer'.
     /// Start writing at 'offset' bytes from the start of the file.
     /// Throws an exception on error.
-    void write( void* buffer, size_t size, offset_t offset ) const;
+    void write( const void* buffer, size_t size, offset_t offset ) const;
 
     /// Returns whether the file was opened with write access.
     bool isWriteable() const { return m_writeable;  }

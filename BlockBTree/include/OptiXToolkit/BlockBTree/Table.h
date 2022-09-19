@@ -169,7 +169,7 @@ public:
                 m_link = ( m_link & ~block_mask ) | ( b << block_shift );
             }
 
-            size_t m_link{ -1 };
+            size_t m_link{ static_cast<size_t>( -1 ) };
         };
 
         Node()
@@ -224,7 +224,7 @@ public:
     }
 
     /// Close a Table.  The contents of the table persist until it is destroyed via the destroy() method.
-    ~Table();
+    ~Table() = default;
 
     /// Get a TableWriter that can be used to insert records in the store.
     /// The Table must have been initialized with write access.
@@ -411,8 +411,8 @@ private:
         std::atomic_size_t* next_record_ptr() { return ( std::atomic_size_t* )( ptr() + next_record_offset() ); }
         std::size_t* snap_id_ptr() { return ( size_t* )( ptr() + snap_id_offset() ); }
 
-        Node* node_ptr( const size_t offset ) { return ptr[ offset ]; }
-        Record* record_ptr( const size_t offset ) { return ptr[ offset ]; }
+        Node* node_ptr( const size_t offset ) { return reinterpret_cast<Node*>( ptr() + offset ); }
+        Record* record_ptr( const size_t offset ) { return reinterpret_cast<Record*>( ptr() + offset ); }
 
         std::atomic_size_t& next_node() { return *next_node_ptr(); }
         std::atomic_size_t& next_record() { return *next_record_ptr(); }
@@ -773,6 +773,21 @@ std::shared_ptr< TableReader< Key, Record, B, BlockSize, BlockAlignment > > Tabl
         it->second.reset( new TableReaderType() );
 
     return it->second;
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+void Table< Key, Record, B, BlockSize, BlockAlignment >::close()
+{
+    std::unique_lock<std::mutex> lock( m_mutex );
+    m_writer.reset();
+    m_readers.clear();    
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+void Table< Key, Record, B, BlockSize, BlockAlignment >::destroy()
+{
+    close();
+    std::filesystem::remove_all( m_directory );
 }
 
 } // namespace sceneDB
