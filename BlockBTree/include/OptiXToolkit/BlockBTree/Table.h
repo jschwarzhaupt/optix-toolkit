@@ -35,6 +35,7 @@
 #include <mutex>
 #include <atomic>
 #include <vector>
+#include <stack>
 #include <memory>
 #include <map>
 #include <algorithm>
@@ -69,28 +70,28 @@ struct Snapshot
     Snapshot( const Snapshot& o ) = delete;
 
     Snapshot( Snapshot&& o ) noexcept
-        : m_snapshotId( o.m_snapshotId )
-        , m_rootIndex( o.m_rootIndex )
-        , m_newBlocks( std::move( o.m_newBlocks ) )
-        , m_modifiedBlocks( std::move( o.m_modifiedBlocks ) )
+        : m_snapshot_id( o.m_snapshot_id)
+        , m_root_index( o.m_root_index)
+        , m_new_blocks( std::move( o.m_new_blocks) )
+        , m_modified_blocks( std::move( o.m_modified_blocks) )
     {
-        o.m_snapshotId = ~0ull;
-        o.m_rootIndex = ~0ull;
+        o.m_snapshot_id = ~0ull;
+        o.m_root_index = ~0ull;
     }
 
-    void setId( const size_t id ) { m_snapshotId = id; }
-    void setRoot( const size_t root ) { m_rootIndex = root; }
+    void set_id( const size_t id ) { m_snapshot_id = id; }
+    void set_root( const size_t root ) { m_root_index = root; }
 
-    bool is_new( const size_t index ) { return m_newBlocks.count( index ) != 0; }
-    bool is_modified( const size_t index ) { return m_modifiedBlocks.count( index ) != 0; }
+    bool is_new( const size_t index ) { return m_new_blocks.count( index ) != 0; }
+    bool is_modified( const size_t index ) { return m_modified_blocks.count( index ) != 0; }
 
-    size_t           m_snapshotId;
-    size_t           m_rootIndex;
-    std::set<size_t> m_newBlocks;
-    std::set<size_t> m_modifiedBlocks;
+    size_t           m_snapshot_id;
+    size_t           m_root_index;
+    std::set<size_t> m_new_blocks;
+    std::set<size_t> m_modified_blocks;
 };
 
-bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshotId < r.m_snapshotId; }
+bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshot_id < r.m_snapshot_id; }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class Table
@@ -119,13 +120,13 @@ public:
             // The next bit differentiates links within a Block (local) from
             // links to other Blocks.
             Link() = default;
-            Link( bool isLeaf, bool isLocal, size_t block, size_t local_address )
+            Link( bool leaf, bool local, size_t block, size_t local_address )
             {
-                OTK_ASSERT( !isLeaf || isLocal ); // Leaf links must be local
-                setLeaf( isLeaf );
-                setLocal( isLocal );
-                setBlock( block );
-                setLocalAddress( local_address );
+                OTK_ASSERT( !leaf || local ); // Leaf links must be local
+                set_leaf( leaf );
+                set_local( local );
+                set_block( block );
+                set_local_address( local_address );
             }
             Link( const Link& o ) : m_link( o.m_link ) {}
 
@@ -135,10 +136,11 @@ public:
                 return *this;
             }
 
-            bool isValid() const { return !( m_link ^ size_t( -1 ) ); }
+            bool is_valid() const { return !( m_link ^ size_t( -1 ) ); }
+            void invalidate() { m_link = static_cast<size_t>( -1 ); }
 
-            bool isLeaf() const { return m_link & leaf_bit; }
-            void setLeaf( bool l )
+            bool is_leaf() const { return m_link & leaf_bit; }
+            void set_leaf( bool l )
             {
                 if( l )
                     m_link |= leaf_bit;
@@ -146,8 +148,8 @@ public:
                     m_link &= ~leaf_bit;
             }
 
-            bool isLocal() const { return m_link & local_bit; }
-            void setLocal( bool l )
+            bool is_local() const { return m_link & local_bit; }
+            void set_local( bool l )
             {
                 if( l )
                     m_link |= local_bit;
@@ -155,18 +157,23 @@ public:
                     m_link &= ~local_bit;
             }
 
-            size_t getLocalAddress() const { return m_link & local_mask; }
-            void setLocalAddress( size_t v )
+            size_t get_local_address() const { return m_link & local_mask; }
+            void set_local_address( size_t v )
             {
                 OTK_ASSERT( v < BlockSize );
                 m_link = ( m_link & ~local_mask ) | ( v & local_mask );
             }
 
-            size_t getBlock() const { return ( m_link & block_mask ) >> block_shift; }
-            void setBlock( size_t b )
+            size_t get_block() const { return ( m_link & block_mask ) >> block_shift; }
+            void set_block( size_t b )
             {
                 OTK_ASSERT( b < block_limit );
                 m_link = ( m_link & ~block_mask ) | ( b << block_shift );
+            }
+
+            bool operator==( const Link& o ) const
+            {
+                return m_link == o.m_link;
             }
 
             size_t m_link{ static_cast<size_t>( -1 ) };
@@ -174,41 +181,177 @@ public:
 
         Node()
         {
-            side_link().first = Key( 0 );
         }
 
+        //static_assert( sizeof( std::atomic<Key> ) == sizeof( Key ), "" );
+        //static_assert( std::atomic<Key>::is_always_lock_free );
         typedef std::pair< Key, Link > Pair_T;
 
-        Pair_T& side_link() { return m_pairs[ B - 1 ]; }
+        //Pair_T& side_link() { return m_pairs[ B - 1 ]; }
+        //const Pair_T& side_link() const { return m_pairs[ B - 1 ]; }
 
-        bool isLeaf()  const { return side_link().second.isLeaf(); }
-        bool isValid() const { return side_link().second.isValid(); }
-        bool isFull()  const { return m_validCount + 1 == B; }
+        bool is_leaf()         const { return m_metadata.is_leaf(); }
+        void set_leaf( bool l )      { m_metadata.set_leaf( l ); }
 
-        Pair_T& find( const Key& key )
+        bool is_valid()        const { return m_valid_count > 0; }
+        bool is_full()         const { return m_valid_count /* + 1*/ >= B; }
+        uint16_t child_count() const { return m_valid_count; }
+
+        bool find( const Key& key, Pair_T* o_pair )
         {
-            Pair_T* it = std::lower_bound( m_pairs, m_pairs + m_validCount, key,
+            OTK_ASSERT( o_pair );
+            Pair_T* start = m_pairs, end = start + m_valid_count;
+            Pair_T* it = std::lower_bound( start, end, key,
                                            []( const Pair_T& e, const Key& c ) {
                                                return e.first < c;
                                            } );
-            if( it - m_pairs )
-                return *( it - 1 );
-            return *it;
+            if( it == end ||
+                it->first != key )
+                return false;
+
+            *o_pair = *it;
+            return true;
         }
 
-        bool tryLatch()
+        Link traverse( const Key& key )
+        {
+            if( key <= low_key() )
+                return m_pairs[ 0 ].second;
+            if( key >= high_key() )
+                return m_pairs[ m_valid_count - 1 ].second;
+
+            Pair_T *start = m_pairs, *end = start + m_valid_count - 1;
+            Pair_T* it = std::lower_bound( start, end, key,
+                                           []( const Pair_T& e, const Key& c ) {
+                                               return e.first < c;
+                                           } );
+            return it->second;
+        }
+
+        Pair_T& get_pair( uint16_t index )
+        {
+            OTK_ASSERT( index < m_valid_count );
+            return m_pairs[ index ];
+        }
+
+        bool has_link( const Link& link );
+
+        void update_link( const Link& link_old, const Link& link_new );
+
+        Key low_key() const
+        {
+            return m_pairs[ 0 ].first;
+        }
+
+        Key high_key() const
+        {
+            return m_pairs[ m_valid_count - 1 ].first;
+        }
+
+        bool insert( const Pair_T& pair )
+        {
+            OTK_ASSERT( !is_full() );
+            Pair_T *start = m_pairs, *end = start + m_valid_count;
+            Pair_T* it = std::lower_bound( start, end, pair.first,
+                                           []( const Pair_T& e, const Key& c ) {
+                                               return e.first < c;
+                                           } );
+            bool exists = ( it != end &&
+                            it->first == pair.first );
+
+            if( exists )
+                it->second = pair.second;
+            else if( !is_full() )
+            {
+                for( Pair_T* src = end; src > it; --src )
+                    *src = *(src - 1);
+                m_valid_count++;
+                *it = pair;
+            }
+            else
+                return false;
+            return true;
+        }
+
+        bool erase( const Pair_T& pair )
+        {
+            Pair_T *start = m_pairs, *end = start + m_valid_count;
+            Pair_T* it = std::lower_bound( start, end, pair.first,
+                                           []( const Pair_T& e, const Key& c ) {
+                                               return e.first < c;
+                                           } );
+            bool exists = ( it != end &&
+                            it->first == pair.first );
+
+            if( !exists )
+                return false;
+
+            for( Pair_T* src = it; src < end; ++src )
+                *src = *(src + 1);
+            m_valid_count--;
+
+            return true;
+        }
+
+        void erase( uint16_t index )
+        {
+            OTK_ASSERT( index < m_valid_count );
+            if( index + 1 == m_valid_count )
+            {
+                // Easy. Don't need to move anything.
+                m_valid_count--;
+                return;
+            }
+
+            for( Pair_T* src = m_pairs + index; src < m_pairs + m_valid_count; ++src )
+                *src = *(src + 1);
+            m_valid_count--;
+        }
+
+        void clear()
+        {
+            m_valid_count = 0;
+        }
+
+        void update_block( const size_t old_block, const size_t new_block )
+        {
+            for( uint16_t i = 0; i < m_valid_count; ++i )
+                if( m_pairs[ i ].second.get_block() == old_block )
+                    m_pairs[ i ].second.set_block( new_block );
+        }
+
+        /*bool split(Node* right_node)
+        {
+            if( !is_full() )
+                return false;
+            right_node->m_metadata.set_leaf( is_leaf() );
+            for( Pair_T* src = m_pairs + (m_valid_count >> 1), dst = right_node->m_pairs; src != m_pairs + m_valid_count; src++, dst++ )
+                *dst = *src;
+            right_node->m_valid_count = m_valid_count - ( m_valid_count >> 1 );
+            m_valid_count -= m_valid_count >> 1;
+        }*/
+
+        /*bool tryLatch()
         {
             return m_latch.compare_exchange_weak( false, true );
+        }
+
+        void latch()
+        {
+            while( !tryLatch() )
+            {
+            }
         }
 
         void unlatch()
         {
             m_latch.store( false );
-        }
+        }*/
 
         Pair_T   m_pairs[ B ];
-        uint16_t m_validCount{ 0 };
-        std::atomic<bool> m_latch{ false };
+        uint16_t m_valid_count{ 0 };
+        Link     m_metadata;
+        //std::atomic<bool> m_latch{ false };
     };
 
     typedef TableWriter<Key, Record, B, BlockSize, BlockAlignment> TableWriterType;
@@ -327,9 +470,22 @@ private:
 };
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-bool operator==( const Table<Key, Record, B, BlockSize, BlockAlignment>::Node::Link& a, const Table<Key, Record, B, BlockSize, BlockAlignment>::Node::Link& b )
+bool Table<Key, Record, B, BlockSize, BlockAlignment>::Node::has_link( const Link& link )
 {
-    return a.m_link == b.m_link;
+    for( uint16_t i = 0; i < m_valid_count; ++i )
+        if( m_pairs[i].second == link )
+            return true;
+    return false;
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+void Table<Key, Record, B, BlockSize, BlockAlignment>::Node::update_link( const Link& link_old, const Link& link_new )
+{
+    for( uint16_t i = 0; i < m_valid_count; ++i )
+        if( m_pairs[i].second == link_old )
+        {
+            m_pairs[i].second = link_new;
+        }
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -348,78 +504,544 @@ private:
     class TableDataBlock
     {
     public:
+        struct Metadata
+        {
+            int m_next_node{ 0 };
+            int m_next_record{ 0 };
+            int m_record_count{ 0 };
+            std::set< int > m_free_nodes;
+            std::set< int > m_free_records;
+        };
+
+        struct RootData
+        {
+            void add_root( uint32_t offset ) { m_root_offsets[ m_root_count++ ] = offset; }
+            void delete_root( uint32_t offset )
+            {
+                for( uint32_t i = 0; i < m_root_count; ++i )
+                    if( m_root_offsets[ i ] == offset )
+                    {
+                        m_root_offsets[ i ] = m_root_offsets[ --m_root_count ];
+                        return;
+                    }
+            }
+            bool is_root(uint32_t offset) const
+            {
+                for( uint32_t i = 0; i < m_root_count; ++i )
+                    if( m_root_offsets[ i ] == offset )
+                    {
+                        return true;
+                    }
+                return false;
+            }
+
+            uint32_t m_root_offsets[ B ];
+            uint32_t m_root_count{ 0 };
+        };
+
         TableDataBlock( std::shared_ptr< DataBlock > data )
             : m_dataBlock( data )
         {
+            OTK_ASSERT( m_dataBlock->size == BlockSize );
+            OTK_ASSERT( usable_size() >= ( B * sizeof( Record ) + sizeof( Node ) ) );
+        }
+
+        void release()
+        {
+            m_dataBlock.reset();
+        }
+
+        bool is_valid() const
+        {
+            return bool( m_dataBlock.get() );
+        }
+
+        void set_data( std::shared_ptr< DataBlock > data )
+        {
+            OTK_ASSERT( data->size == BlockSize );
+            m_dataBlock = data;
+        }
+
+        void compact_nodes( Node* parent )
+        {
+            RootData& rd = *root_data_ptr();
+            std::map< int, int > remap;
+
+            while( !m_metaData.m_free_nodes.empty() )
+            {
+                int offset_new = m_metaData.m_free_nodes.extract( m_metaData.m_free_nodes.begin() ).value();
+                int offset_old = m_metaData.m_next_node - sizeof( Node );
+
+                *node( offset_new ) = *node( offset_old );
+
+                bool is_root = false;
+                for( int i = 0; i < rd.m_root_count; ++i )
+                    if( rd.m_root_offsets[ i ] == offset_old )
+                    {
+                        is_root = true;
+                        rd.m_root_offsets[ i ] = offset_new;
+
+                        if( parent )
+                            parent->update_link( Link( false, false, index(), offset_old ), Link( false, false, index(), offset_new ) );
+
+                        break;
+                    }
+
+                if( !is_root )
+                    remap.insert( { offset_old, offset_new } );
+
+                m_metaData.m_next_node -= sizeof( Node );
+                while( m_metaData.m_free_nodes.count( m_metaData.m_next_node - sizeof( Node ) ) )
+                {
+                    // Advance through contiguous free space.
+                    m_metaData.m_next_node -= sizeof( Node );
+                    m_metaData.m_free_nodes.erase( m_metaData.m_free_nodes.find( m_metaData.m_next_node ) );
+                }
+            }
+
+            if( remap.empty() )
+                return;
+
+            for( int offset = 0; offset < m_metaData.m_next_node && !remap.empty(); offset += sizeof( Node ) )
+            {
+                for( auto it = remap.begin(); it != remap.end(); ++it )
+                {
+                    Link link_old( true, true, index(), it->first );
+
+                    if( node( offset )->has_link( link_old ) )
+                    {
+                        Link link_new( true, true, index(), it->second );   
+                        node( offset )->update_link( link_old, link_new );
+                        remap.erase( it );
+                        break;
+                    }
+                }
+            }
+        }
+
+        void compact_records()
+        {
+            std::map< int, int > remap;
+
+            while( !m_metaData.m_free_records.empty() )
+            {
+                int offset_new = m_metaData.m_free_records.extract( std::prev( m_metaData.m_free_records.end() ) ).value();
+                int offset_old = m_metaData.m_next_record + sizeof( Record );
+
+                record( offset_new ) = record( offset_old );
+
+                remap.insert( { offset_old, offset_new } );
+
+                m_metaData.m_next_record += sizeof( Record );
+                while( m_metaData.m_free_records.count( m_metaData.m_next_record + sizeof( Record ) ) )
+                {
+                    // Advance through contiguous free space.
+                    m_metaData.m_next_record += sizeof( Record );
+                    m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record ) );
+                }
+            }
+
+            if( remap.empty() )
+                return;
+
+            for( int offset = 0; offset < m_metaData.m_next_node && !remap.empty(); offset += sizeof( Node ) )
+            {
+                // Skip free nodes.
+                if( m_metaData.m_free_nodes.count( offset ) ||
+                    !node( offset )->is_leaf() )
+                    continue;
+                for( auto it = remap.begin(); it != remap.end(); ++it )
+                {
+                    Link link_old( true, true, index(), it->first );
+
+                    if( node( offset )->has_link( link_old ) )
+                    {
+                        Link link_new( true, true, index(), it->second );   
+                        node( offset )->update_link( link_old, link_new );
+                        remap.erase( it );
+                    }
+                }
+            }
+        }
+        
+        size_t compact_records_free_bytes() const
+        {
+            return m_metaData.m_free_records.size() * sizeof( Record );
+        }
+
+        size_t compact_nodes_free_bytes() const
+        {
+            return m_metaData.m_free_nodes.size() * sizeof( Node );
+        }
+
+        size_t no_compact_free_bytes() const
+        {
+            return m_metaData.m_next_record + sizeof( Record ) - m_metaData.m_next_node;
+        }
+
+        size_t total_free_bytes() const
+        {
+            return compact_nodes_free_bytes() + compact_records_free_bytes() + no_compact_free_bytes();
+        }
+
+        template< size_t size >
+        bool has_room_for_n( uint32_t n, bool& need_node_compaction, bool& need_record_compaction ) const
+        {
+            need_node_compaction   = false;
+            need_record_compaction = false;
+
+            auto nc_fb = no_compact_free_bytes();
+
+            if( nc_fb >= n * size )
+                return true;
+
+            auto cr_fb = compact_records_free_bytes();
+            if( nc_fb + cr_fb >= n * size )
+            {
+                need_record_compaction = true;
+                return true;
+            }
+
+            auto cn_fb = compact_nodes_free_bytes();
+            if( nc_fb + cn_fb >= n * size )
+            {
+                need_node_compaction = true;
+                return true;
+            }
+
+            if( total_free_bytes() >= n * size )
+            {
+                need_node_compaction   = true;
+                need_record_compaction = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        bool has_room_for_n_nodes( uint32_t n, bool& need_node_compaction, bool& need_record_compaction ) const
+        {
+            return has_room_for_n< sizeof(Node) >( n, need_node_compaction, need_record_compaction );
+        }
+
+        bool has_room_for_n_records( uint32_t n, bool& need_node_compaction, bool& need_record_compaction ) const
+        {
+            return has_room_for_n< sizeof(Record) >( n, need_node_compaction, need_record_compaction );
+        }
+
+        uint32_t add_node()
+        {
+            int result = -1;
+
+            if( m_metaData.m_free_nodes.size() )
+            {
+                result = m_metaData.m_free_nodes.extract( m_metaData.m_free_nodes.begin() ).value();
+            }
+            else if( no_compact_free_bytes() >= sizeof( Node ) )
+            {
+                result = m_metaData.m_next_node;
+                m_metaData.m_next_node += sizeof( Node );
+            }
+
+            if( result >= 0 )
+            {
+                new ( node( result ) ) Node();
+            }
+
+            return uint32_t( result );
+        }
+
+        void remove_node( const uint32_t offset )
+        {
+            OTK_ASSERT( offset < usable_size() );
+            if( offset >= m_metaData.m_next_node )
+                return;
+
+            if( m_metaData.m_next_node - sizeof( Node ) == offset )
+            {
+                m_metaData.m_next_node -= sizeof( Node );
+                // Coalesce free space at the end.
+                while( m_metaData.m_free_nodes.count( m_metaData.m_next_node - sizeof( Node ) ) )
+                {
+                    m_metaData.m_next_node -= sizeof(Node);
+                    m_metaData.m_free_nodes.erase( m_metaData.m_free_nodes.find( m_metaData.m_next_node ) );
+                }
+            }
+            else
+                m_metaData.m_free_nodes.insert( offset );
+        }
+
+        uint32_t add_record( const Record& new_record )
+        {
+            int result = -1;
+
+            if( m_metaData.m_free_records.size() )
+            {
+                result = m_metaData.m_free_records.extract( std::prev( m_metaData.m_free_records.end() ) ).value();
+            }
+            else if( no_compact_free_bytes() >= sizeof( Record ) )
+            {
+                result = m_metaData.m_next_record;
+                m_metaData.m_next_record -= sizeof( Record );
+            }
+
+            if( result >= 0 )
+            {
+                record( result ) = new_record;
+                m_metaData.m_record_count++;
+            }
+
+            return uint32_t( result );
+        }
+
+        void remove_record( const uint32_t offset )
+        {
+            OTK_ASSERT( offset < usable_size() );
+            if( offset <= m_metaData.m_next_record )
+                return;
+
+            m_metaData.m_record_count--;
+
+            if( m_metaData.m_next_record - sizeof( Record ) == offset )
+            {
+                m_metaData.m_next_record += sizeof( Record );
+                // Coalesce free space at the end.
+                while( m_metaData.m_free_records.count( m_metaData.m_next_record + sizeof( Record ) ) )
+                {
+                    m_metaData.m_next_record += sizeof( Record );
+                    m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record) );
+                }
+            }
+            else
+                m_metaData.m_free_records.insert( offset );
+        }
+
+        void add_root( const uint32_t offset )
+        {
+            auto rd = root_data_ptr();
+            OTK_ASSERT( rd->m_root_count < B );
+            rd->m_root_offsets[ rd->m_root_count++ ] = offset;
+        }
+
+        void remove_root( const uint32_t offset )
+        {
+            auto rd = root_data_ptr();
+            uint32_t index = ~0u;
+            for( uint32_t i = 0; i < rd->m_root_count; ++i )
+                if( rd->m_root_offsets[ i ] == offset )
+                {
+                    index = i;
+                    break;
+                }
+
+            if( index != ~0u )
+            {
+                rd->m_root_offsets[ index ] = rd->m_root_offsets[ --rd->m_root_count ];
+            }
+        }
+
+        uint32_t migrate_subtree( uint32_t src_root_offset, std::shared_ptr<TableDataBlock> dst_block )
+        {
+            uint32_t dst_root_offset = -1;
+            
+            // Check for newly minted block, which already has a single (but empty) node.
+            if( dst_block->root_count() == 1 &&
+                dst_block->node( dst_block->root_offset( 0 ) )->child_count() == 0 )
+                dst_root_offset = dst_block->root_offset( 0 );
+
+            if( dst_root_offset == uint32_t( -1 ) )
+            {
+                dst_root_offset = dst_block->add_node();
+                dst_block->add_root( dst_root_offset );
+            }
+
+            OTK_ASSERT( dst_root_offset != uint32_t( -1 ) );
+
+            std::stack< std::pair< uint32_t, uint32_t > > s;
+            s.push( { src_root_offset, dst_root_offset } );
+
+            do
+            {
+                auto offset_pair = s.top();
+                s.pop();
+
+                Node* src_node = node( offset_pair.first );
+                Node* dst_node = dst_block->node( offset_pair.second );
+
+                dst_node->set_leaf( src_node->is_leaf() );
+
+                for( uint16_t j = 0; j < src_node->child_count(); ++j )
+                {
+                    Pair_T& src_pair = src_node->get_pair( j );
+                    Pair_T  dst_pair = src_pair;
+
+                    if( src_pair.second.is_local() )
+                    {
+                        dst_pair.second.set_block( dst_block->index() );
+                        if( src_node->is_leaf() )
+                        {
+                            OTK_ASSERT( src_pair.second.is_leaf() );
+                            uint32_t offset = dst_block->add_record( record( src_pair.second.get_local_address() ) );
+                            OTK_ASSERT( offset != uint32_t( -1 ) );
+                            dst_pair.second.set_local_address( offset );
+                            remove_record( src_pair.second.get_local_address() );
+                        }
+                        else
+                        {
+                            OTK_ASSERT( !src_pair.second.is_leaf() );
+                            uint32_t offset = dst_block->add_node();
+                            OTK_ASSERT( offset != uint32_t( -1 ) );
+                            dst_pair.second.set_local_address( offset );
+                            s.push( { uint32_t( src_pair.second.get_local_address() ), offset } );
+                        }
+                    }
+
+                    dst_node->insert( dst_pair );
+                }
+
+                remove_node( offset_pair.first );
+
+            } while (!s.empty());
+
+            return dst_root_offset;
         }
 
         void init( const Snapshot& snapshot )
         {
             set_snapshot( snapshot );
-            new ( ptr() ) Node();
+            new ( root_data_ptr() ) RootData();
 
-            next_node() = sizeof( Node );
-            next_record() = snap_id_offset() - record_size;
+            auto offset = add_node();
+            OTK_ASSERT( offset == 0 );
+            add_root( offset );
+
+            m_metaData.m_next_record = record_offset();
+        }
+
+        void init_existing()
+        {
+            const auto& root_data = *root_data_ptr();
+            
+            std::set< uint32_t > nodes;
+            std::set< uint32_t > records;
+
+            for( uint32_t i = 0; i < root_data.m_root_count; ++i )
+            {
+                std::stack< uint32_t > s;
+                s.push( root_data.m_root_offsets[ i ] );
+
+                do
+                {
+                    uint32_t offset = s.top();
+                    s.pop();
+
+                    nodes.insert( offset );
+
+                    Node* n = node( offset );
+                    for( uint16_t j = 0; j < n->child_count(); ++j )
+                    {
+                        Link& link = n->get_pair( j ).second;
+                        if( n->is_leaf() )
+                            records.insert( link.get_local_address() );
+                        else if( link.is_local() )
+                            s.push( link.get_local_address() );
+
+                        if( link.is_local() )
+                            link.set_block( index() );
+                    }
+                } while( !s.empty() );
+            }
+
+            OTK_ASSERT( nodes.size() );
+            m_metaData.m_next_node   = *nodes.rbegin() + sizeof( Node );
+            m_metaData.m_next_record = *records.begin() - sizeof( Record );
+
+            uint32_t curr = 0;
+            for( uint32_t offset : nodes )
+            {
+                while( curr < offset )
+                {
+                    m_metaData.m_free_nodes.insert( curr );
+                    curr += sizeof( Node );
+                }
+                curr += sizeof( Node );
+            }
+
+            curr = *records.begin();
+            for( uint32_t offset : records )
+            {
+                while( curr < offset )
+                {
+                    m_metaData.m_free_records.insert( curr );
+                    curr += sizeof( Record );
+                }
+                curr += sizeof( Record );
+            }
+        }
+
+        uint32_t root_count() const
+        {
+            return root_data_ptr()->m_root_count;
+        }
+
+        size_t root_offset( uint32_t root_index ) const
+        {
+            OTK_ASSERT( root_index < root_count() );
+            return root_data_ptr()->m_root_offsets[ root_index ];
+        }
+
+        bool is_root( uint32_t offset ) const
+        {
+            return root_data_ptr()->is_root( offset );
         }
 
         void set_snapshot( const Snapshot& snapshot )
         {
-            snapshot_id() = snapshot.m_snapshotId;
+            snapshot_id() = snapshot.m_snapshot_id;
         }
 
-        Node* root() { return node_ptr( 0 ); }
-        const Node* root() const { return node_ptr( 0 ); }
+        Node* node( const size_t offset ) { OTK_ASSERT( offset < m_metaData.m_next_node ); return node_ptr( offset ); }
+        const Node* node( const size_t offset ) const { OTK_ASSERT( offset < m_metaData.m_next_node ); return node_ptr( offset ); }
 
-        Node* node( const size_t offset ) { OTK_ASSERT( offset < next_node() ); return node_ptr( offset ); }
-        const Node* node( const size_t offset ) const { OTK_ASSERT( offset < next_node() ); return node_ptr( offset ); }
-
-        std::pair< Node*, size_t > get_next_node()
-        {
-            OTK_ASSERT( bytes_free() > sizeof( Node ) );
-            size_t offset = next_node();
-            next_node() += sizeof( Node );
-            new ( ptr() + offset ) Node();
-            return std::make_pair( node_ptr( offset ), offset );
-        }
-
-        Record& record( const size_t offset ) { OTK_ASSERT( offset >= next_record() ); return *record_ptr( offset ); }
-        const Record& record( const size_t offset ) const { OTK_ASSERT( offset >= next_record() ); return *record_ptr( offset ); }
-
-        std::pair< Record*, size_t > get_next_record()
-        {
-            OTK_ASSERT( bytes_free() > record_size );
-            size_t offset = next_record();
-            next_record() -= record_size;
-            new ( ptr() + offset ) Record();
-            return std::make_pair( record_ptr( offset ), offset );
-        }
+        Record& record( const size_t offset ) { OTK_ASSERT( offset >= m_metaData.m_next_record ); return *record_ptr( offset ); }
+        const Record& record( const size_t offset ) const { OTK_ASSERT( offset >= m_metaData.m_next_record ); return *record_ptr( offset ); }
 
         static constexpr size_t size() { return BlockSize; }
+        size_t usable_size()   const { return root_data_offset(); }
 
-        size_t bytes_free() const { return next_record() + record_size - next_node(); }
+        bool is_full() const { return total_free_bytes() >= ( m_metaData.m_record_count ? std::max( sizeof( Node ), sizeof( Record ) ) : sizeof( Node ) ); }
 
         size_t index() const { return m_dataBlock->index; }
 
     private:
-        static constexpr size_t next_node_offset() { return size() - sizeof( std::atomic_size_t ); }
-        static constexpr size_t next_record_offset() { return next_node_offset() - sizeof( std::atomic_size_t ); }
-        static constexpr size_t snap_id_offset() { return next_record_offset() - sizeof( std::size_t ); }
+        static constexpr uint32_t snap_id_offset()   { return size() - sizeof( std::size_t ); }
+        static constexpr uint32_t root_data_offset() { return snap_id_offset() - sizeof( RootData ); }
+        static constexpr uint32_t record_offset()    { return root_data_offset() - sizeof( Record ) - ( ( root_data_offset() - sizeof( Record ) ) % alignof( Record ) ); }
 
-        char* ptr() { return ( char* )( m_dataBlock->get_data() ); }
+        char*       ptr()       { return ( char* )( m_dataBlock->get_data() ); }
+        const char* ptr() const { return ( const char* )( m_dataBlock->get_data() ); }
 
-        std::atomic_size_t* next_node_ptr() { return ( std::atomic_size_t* )( ptr() + next_node_offset() ); }
-        std::atomic_size_t* next_record_ptr() { return ( std::atomic_size_t* )( ptr() + next_record_offset() ); }
         std::size_t* snap_id_ptr() { return ( size_t* )( ptr() + snap_id_offset() ); }
 
-        Node* node_ptr( const size_t offset ) { return reinterpret_cast<Node*>( ptr() + offset ); }
-        Record* record_ptr( const size_t offset ) { return reinterpret_cast<Record*>( ptr() + offset ); }
+        RootData*       root_data_ptr()       { return reinterpret_cast< RootData* >( ptr() + root_data_offset() ); }
+        const RootData* root_data_ptr() const { return reinterpret_cast< const RootData* >( ptr() + root_data_offset() ); }
 
-        std::atomic_size_t& next_node() { return *next_node_ptr(); }
-        std::atomic_size_t& next_record() { return *next_record_ptr(); }
+        Node*       node_ptr( const size_t offset )       { return reinterpret_cast< Node* >( ptr() + offset ); }
+        const Node* node_ptr( const size_t offset ) const { return reinterpret_cast< const Node* >( ptr() + offset ); }
+
+        Record*       record_ptr( const size_t offset )       { return reinterpret_cast< Record* >( ptr() + offset ); }
+        const Record* record_ptr( const size_t offset ) const { return reinterpret_cast< const Record* >( ptr() + offset ); }
+
         size_t& snapshot_id() { return *snap_id_ptr(); }
 
         std::shared_ptr< DataBlock > m_dataBlock;
+        Metadata                     m_metaData;
+        //std::condition_variable      m_cv;
+        //std::mutex                   m_mutex;
+        //std::atomic_uint32_t         m_ref_count;
     };
+
+    typedef std::shared_ptr<TableDataBlock> TableDataBlockPtr;
 
 public:
     TableWriter( std::shared_ptr< BlockFile > data_file, std::shared_ptr< const Snapshot > latest_snapshot )
@@ -427,100 +1049,131 @@ public:
     {
         if( latest_snapshot )
         {
-            m_currentSnapshot.setId( latest_snapshot->m_snapshotId + 1 );
-            m_currentSnapshot.setRoot( latest_snapshot->m_rootIndex );
+            m_currentSnapshot.set_id( latest_snapshot->m_snapshot_id + 1 );
+            m_currentSnapshot.set_root( latest_snapshot->m_root_index );
         }
         else
         {
-            m_currentSnapshot.setId( 0 );
-            m_currentSnapshot.setRoot( 0 );
+            m_currentSnapshot.set_id( 0 );
+            m_currentSnapshot.set_root( 0 );
         }
     }
 
+    /*bool traverse_side_links(Node*& curr_node, TableDataBlockPtr curr_block, Link& current, const Key& key)
+    {
+        bool link_used = false;
+        while( curr_node->side_link().first && key >= curr_node->side_link().first )
+        {
+            if( current.getBlock() != curr_node->side_link().second.getBlock() )
+                curr_block = get_block( curr_node->side_link().second.getBlock() );
+
+            current = curr_node->side_link().second;
+            curr_node = curr_block->node( current.getLocalAddress() );
+            link_used = true;
+        }
+        return link_used;
+    }*/
+
     void Insert( const Key& key, const Record& record )
     {
-        Link current = get_root_link();
-        Link parent  = get_root_link();
-        
-        TableDataBlock curr_block = get_block( current.getBlock() );
-        do
+        // Non-concurrent version.         
+        Link root_link         = get_root_link();
+        Link block_parent_link = Link();
+        Link parent_link       = Link();
+        Link current_link      = root_link;
+
+        TableDataBlockPtr block = get_root_block();
+
+        while( true )
         {
-            Node* curr_node = curr_block.node( current.getLocalAddress() );
-
-            // Traverse side links.
-            while( curr_node->side_link().first && key >= curr_node->side_link().first )
+            if( block->is_full() )
             {
-                if( current.getBlock() != curr_node->side_link().second.getBlock() )
-                    curr_block = get_block( curr_node->side_link().second.getBlock() );
-
-                current = curr_node->side_link().second;
-                curr_node = curr_block.node( current.getLocalAddress() );
-            }
-
-            if( curr_node->isFull() )
-                if( current == parent &&
-                    current != get_root_link() )
+                Node* block_parent_node = nullptr;
+                if( block_parent_link.is_valid() )
                 {
-                    current = parent = get_root_link();
+                    block_parent_node = get_block( block_parent_link.get_block() )->node( block_parent_link.get_local_address() );
                 }
 
-            if( curr_node->isFull() || curr_node->isLeaf() )
+                split_block( block, block_parent_node );
+
+                parent_link = block_parent_link;
+                if( block_parent_node )
+                    current_link = block_parent_node->traverse( key );
+                else
+                    current_link = root_link;
+
+                block = get_block( current_link.get_block() );
+                continue;
+            }
+
+            Node* current_node = block->node( current_link.get_local_address() );
+            if( current_node->is_full() )
             {
-                if( !curr_node->tryLatch() )
+                Node* block_parent_node = nullptr;
+                if( block_parent_link.is_valid() )
                 {
-                    if( current.getBlock() != parent.getBlock() )
-                        curr_block = get_block( parent.getBlock() );
-                    current = parent;
+                    block_parent_node = get_block( block_parent_link.get_block() )->node( block_parent_link.get_local_address() );
+                }
+
+                Node* parent_node = nullptr;
+                if( parent_link.is_valid() )
+                {
+                    parent_node = get_block( parent_link.get_block() )->node( parent_link.get_local_address() );
+                }
+
+                if( !split_node( block, parent_node, block_parent_node, current_link ) )
+                {
+                    // Had to split the block internally, or shuffle things around.
+                    // Need to restart from the block_parent (or root).
+                    parent_link = block_parent_link;
+                    if( block_parent_node )
+                        current_link = block_parent_node->traverse( key );
+                    else
+                        current_link = root_link;
+
+                    block = get_block( current_link.get_block() );
                     continue;
                 }
+
+                if( parent_node )
+                {
+                    current_link = parent_node->traverse( key );
+                    block = get_block( current_link.get_block() );
+                    current_node = block->node( current_link.get_local_address() );
+                }
+                else
+                {
+                    OTK_ASSERT( current_link == root_link );
+                    OTK_ASSERT( block->index() == current_link.get_block() );
+                    OTK_ASSERT( block->node( current_link.get_local_address() ) == current_node );
+                }
             }
 
-            if( curr_node->isFull() )
+            if( current_node->is_leaf() )
             {
-                bool result = trySplitAndUpdateParent( current, parent );
-                if( result == true && !curr_node->isLeaf() )
-                    curr_node->unlatch();
-                else if( result == parent_full || result == unknown )
-                {
-                    curr_node->unlatch();
-                    if( current.getBlock() != parent.getBlock() )
-                        curr_block = get_block( parent.getBlock() );
-                    current = parent;
+                // If we split the a node, block could have filled up, in which case
+                // we go around the loop again to split it.
+                if( block->is_full() )
                     continue;
-                }
+
+                uint32_t offset = block->add_record( record );
+                OTK_ASSERT( offset != uint32_t( -1 ) );
+
+                bool result = current_node->insert( std::make_pair( key, Link( true, true, block->index(), offset ) ) );
+                OTK_ASSERT( result );
+                return;
             }
 
-            const Pair_T& pair = curr_node->find( key );
-
-            if( curr_node->isLeaf() )
+            Link next_link = current_node->traverse( key );
+            if( next_link.get_block() != block->index() )
             {
-                if( pair.first != key )
-                {
-                    auto new_pair = curr_block.get_next_record();
-                    *new_pair.first = record;
-                    curr_node->insert( Pair_T( key, Link( true, true, current.getBlock(), new_pair.second ) ) );
-                }
-
-                curr_node->unlatch();
+                block_parent_link = current_link;
+                block = get_block( next_link.get_block() );
             }
-            else
-            {
-                OTK_ASSERT( pair.second.isValid() );
-                OTK_ASSERT( !pair.second.isLeaf() );
-                OTK_ASSERT( pair.first < key );
 
-                if( current.getBlock() != pair.second.getBlock() )
-                    curr_block = get_block( pair.second.getBlock() );
-
-                current = pair.second;
-            }
-        } while( !current.isLeaf() );
-        //current = parent = root.root();
-        //if( node. )
-        // Get Root block.
-        // Traverse to leaf.
-        // If node full, split.
-        // Insert into leaf.
+            parent_link  = current_link;
+            current_link = next_link;            
+        }
     }
 
     void Erase( const Key& key )
@@ -535,7 +1188,9 @@ public:
         Snapshot snapshot( std::move( m_currentSnapshot ) );
 
         m_currentSnapshot.setId( snapshot.m_snapshotId + 1 );
-        m_currentSnapshot.setRoot( snapshot.m_rootIndex );
+        m_currentSnapshot.setRoot( snapshot.m_root_index );
+
+        m_root_link.invalidate();
 
         return std::move( snapshot );
     }
@@ -544,79 +1199,285 @@ public:
     TableWriter( const TableWriter& o ) = delete;
     
 private:
+    void split_block( TableDataBlockPtr block, Node* block_parent )
+    {
+        bool skip_first = false;
+        Node* _parent   = nullptr;
+
+        if( !block_parent || 
+            block->root_count() == 1 )
+        {
+            _parent = block->node( block->root_offset( 0 ) );
+        }
+        else
+        {
+            OTK_ASSERT( block_parent );
+            _parent    = block_parent;
+            skip_first = true; // Skip first subtree, which remains in the same block.
+        }
+
+        OTK_ASSERT( _parent );
+        auto child_count = _parent->child_count();
+
+        for( uint32_t i = 0; i < child_count; ++i )
+        {
+            Pair_T& child_pair = _parent->get_pair( i );
+
+            if( child_pair.second.get_block() != block->index() )
+                continue;
+
+            if( skip_first )
+            {
+                skip_first = false;
+                continue;
+            }
+
+            if( block_parent )
+                OTK_ASSERT( block->is_root( child_pair.second.get_local_address() ) );
+
+            TableDataBlockPtr new_block = get_new_block();
+            size_t offset = block->migrate_subtree( child_pair.second.get_local_address(), new_block );
+
+            child_pair.second.set_local( false );
+            child_pair.second.set_block( new_block->index() );
+            child_pair.second.set_local_address( offset );
+        }
+    }
+
+    // Returns whether the split succeeded or not.
+    // Split may not succeed if the block needs to be split,
+    // in which case traversal needs to be restarted from the
+    // block's parent (as nodes can move).
+    bool split_node( TableDataBlockPtr block, Node* parent, Node* block_parent, Link src_link )
+    {
+        OTK_ASSERT( src_link.get_local_address() == block->index() );
+        Node* src_node = block->node( src_link.get_local_address() );
+        OTK_ASSERT( src_node->is_full() );
+
+        if( !parent )
+        {
+            OTK_ASSERT( !block_parent );
+            OTK_ASSERT( block->is_root( src_link.get_local_address() ) );
+            // Root node case. Keep src_node as the root node.
+            // Add two nodes, migrate half the data to each.
+            bool need_node_compaction = false, need_record_compaction = false;
+            if( !block->has_room_for_n_nodes( 2, need_node_compaction, need_record_compaction ) )
+            {
+                split_block( block, nullptr );
+            }
+            
+            if( need_record_compaction )
+                block->compact_records();
+            if( need_node_compaction )
+            {
+                block->compact_nodes( nullptr );
+                // Pretty certain that node compaction can't move the Table's root.
+                OTK_ASSERT( block->root_offset( 0 ) == src_link.get_local_address() );
+            }
+
+            OTK_ASSERT( block->has_room_for_n_nodes( 2, need_node_compaction, need_record_compaction ) );
+
+            uint32_t left_offset  = block->add_node();
+            uint32_t right_offset = block->add_node();
+
+            Node* left_node  = block->node( left_offset );
+            Node* right_node = block->node( right_offset );
+
+            left_node->set_leaf( src_node->is_leaf() );
+            right_node->set_leaf( src_node->is_leaf() );
+
+            uint16_t count = src_node->child_count();
+            uint16_t left_count = count >> 1;
+
+            for( uint16_t i = 0; i < left_count; ++i )
+                left_node->insert( src_node->get_pair( i ) );
+            for( uint16_t i = left_count; i < count; ++i )
+                right_node->insert( src_node->get_pair( i ) );
+
+            src_node->clear();
+            src_node->set_leaf( false );
+
+            src_node->insert( {  left_node->low_key(), Link( false, true, block->index(), left_offset ) } );
+            src_node->insert( { right_node->low_key(), Link( false, true, block->index(), right_offset ) } );
+        }
+        else
+        {
+            // Non-root case.
+            bool need_node_compaction = false, need_record_compaction = false;
+            if( !block->has_room_for_n_nodes( 1, need_node_compaction, need_record_compaction ) )
+            {
+                split_block( block, block_parent );
+                return false;
+            }
+            
+            if( need_node_compaction )
+            {
+                block->compact_nodes( block_parent );
+                return false;
+            }
+            if( need_record_compaction )
+                block->compact_records();
+
+            OTK_ASSERT( block->has_room_for_n_nodes( 1, need_node_compaction, need_record_compaction ) );
+
+            uint16_t count = src_node->child_count();
+            uint16_t left_count = count >> 1;
+
+            // Check to see if splitting the node would result in two
+            // nodes pointing to the same block, which can't happen.
+            // If so, migrate some subtrees to a new block.
+            if( !src_node->get_pair( left_count - 1 ).second.is_local() &&
+                src_node->get_pair( left_count - 1 ).second.get_block() == src_node->get_pair( left_count ).second.get_block() )
+            {
+                size_t block_index = src_node->get_pair( left_count ).second.get_block();
+                OTK_ASSERT( block_index != block->index() );
+                uint16_t left_n = 0, right_n = 0;
+
+                for( uint16_t i = 0; i < count; ++i )
+                    if( src_node->get_pair( i ).second.get_block() == block_index )
+                    {
+                        if (i < left_count)
+                            left_n++;
+                        else
+                            right_n++;
+                    }
+
+                TableDataBlockPtr new_block = get_new_block();
+
+                uint16_t start = 0;
+                uint16_t end   = left_count;
+                if( left_n > right_n )
+                {
+                    start = left_count;
+                    end   = count;
+                }
+
+                TableDataBlockPtr src_block = get_block( block_index );
+                // Check for copy_on_write of src_block
+                if( src_block->index() != block_index )
+                {
+                    src_node->update_block( block_index, src_block->index() );
+                    block_index = src_block->index();
+                }
+
+                for( uint16_t i = start; i < end; ++i )
+                {
+                    Pair_T& pair = src_node->get_pair( i );
+                    if( pair.second.get_block() != block_index )
+                        continue;
+
+                    size_t offset = src_block->migrate_subtree( pair.second.get_local_address(), new_block );
+
+                    pair.second.set_local( false );
+                    pair.second.set_block( new_block->index() );
+                    pair.second.set_local_address( offset );
+                }
+            }
+
+            // Now add a new node and move half of this node to it.
+            uint32_t right_offset = block->add_node();
+            Node* right_node      = block->node(right_offset);
+
+            right_node->set_leaf( src_node->is_leaf() );
+
+            for( uint16_t i = left_count; i < count; ++i )
+                right_node->insert( src_node->get_pair( i ) );
+
+            for( uint16_t i = count - 1; i >= left_count; --i )
+                src_node->erase( i );
+
+            parent->insert( { right_node->low_key(), Link( false, true, block->index(), right_offset ) } );
+        }
+
+        return true;
+    }
+
     size_t copy_on_write( const size_t block_index )
     {
         auto old_block = m_dataFile->checkOutForRead( block_index );
         auto new_block = m_dataFile->checkOutNewBlock();
 
         *new_block = *old_block;
-        TableDataBlock block( new_block );
-        block.set_snapshot( m_currentSnapshot );
-        m_currentSnapshot.m_modifiedBlocks.insert( old_block->index );
-        m_currentSnapshot.m_newBlocks.insert( new_block->index );
+        TableDataBlockPtr block = std::make_shared< TableDataBlock >( new_block );
+        block->set_snapshot( m_currentSnapshot );
+        block->init_existing();
+        block->compact_records(); // Can't compact nodes as we would need to know the parent.
+
+        m_currentSnapshot.m_modified_blocks.insert( old_block->index );
+        m_currentSnapshot.m_new_blocks.insert( new_block->index );
+
+        m_blockMap[ new_block->index ] = block;
 
         return new_block->index;
     }
 
-    TableDataBlock get_block( size_t index )
+    TableDataBlockPtr get_block( size_t index )
     {
         OTK_ASSERT( m_dataFile->exists( index ) );
         if( !m_currentSnapshot.is_new( index ) )
         {
             index = copy_on_write( index );
         }
+        else if( !m_blockMap.count( index ) )
+        {
+            m_blockMap.emplace( std::make_pair( index, std::make_shared< TableDataBlock >( m_dataFile->checkOutForReadWrite( index ) ) ) );
+            m_blockMap[ index ]->init_existing();
+        }
 
-        return TableDataBlock( m_dataFile->checkOutForReadWrite( index ) );
+        return m_blockMap.at( index );
     }
 
-    TableDataBlock get_new_block()
+    TableDataBlockPtr get_new_block()
     {
-        TableDataBlock new_block( m_dataFile->checkOutNewBlock() );
-        new_block.init( m_currentSnapshot );
-        m_currentSnapshot.m_newBlocks.insert( new_block.index() );
+        TableDataBlockPtr new_block = std::make_shared< TableDataBlock >( m_dataFile->checkOutNewBlock() );
+        new_block->init( m_currentSnapshot );
+        m_currentSnapshot.m_new_blocks.insert( new_block->index() );
+        m_blockMap[ new_block->index() ] = new_block;
         return new_block;
     }
 
-    TableDataBlock get_root_block()
+    TableDataBlockPtr get_root_block()
     {
-        if( !m_dataFile->exists( m_currentSnapshot.m_rootIndex ) )
+        if( !m_dataFile->exists( m_currentSnapshot.m_root_index ) )
         {
-            auto new_block = get_new_block();
-            OTK_ASSERT( new_block.index() == m_currentSnapshot.m_rootIndex );
-            return new_block;
+            TableDataBlockPtr new_block = get_new_block();
+            OTK_ASSERT( new_block->index() == m_currentSnapshot.m_root_index );
+            Node* root = new_block->node( new_block->root_offset( 0 ) );
+            root->set_leaf( true );
         }
-        else if( !m_currentSnapshot.is_new( m_currentSnapshot.m_rootIndex ) )
+        else if( !m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) )
         {
-            m_currentSnapshot.setRoot( copy_on_write( m_currentSnapshot.m_rootIndex ) );
+            m_currentSnapshot.set_root( copy_on_write( m_currentSnapshot.m_root_index ) );
+        }
+        else if( !m_blockMap.count( m_currentSnapshot.m_root_index ) )
+        {
+            m_blockMap.emplace( m_currentSnapshot.m_root_index, std::make_shared< TableDataBlock >( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_root_index ) ) );
+            m_blockMap[ m_currentSnapshot.m_root_index ]->init_existing();
         }
 
-        return TableDataBlock( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_rootIndex ) );
+        return m_blockMap.at( m_currentSnapshot.m_root_index );
     }
 
     Link get_root_link()
     {
-        if( !m_root_link.isValid() )
+        if( !m_root_link.is_valid() )
         {
-            TableDataBlock root_block = get_root_block();
-            const Node& root_node = root_block.root();
+            TableDataBlockPtr root_block = get_root_block();
 
-            m_root_link.setLocal( false );
-            m_root_link.setBlock( m_currentSnapshot.m_rootIndex );
-            m_root_link.setLocalAddress( 0 );
-
-            if( root_node.isValid() )
-                m_root_link.setLeaf( root_node.isLeaf() );
-            else
-                m_root_link.setLeaf( true ); // This only happens for the first root node created, which is always a leaf at first.
+            m_root_link.set_local( false );
+            m_root_link.set_leaf( false );
+            m_root_link.set_block( m_currentSnapshot.m_root_index );
+            m_root_link.set_local_address( root_block->root_offset( 0 ) );
         }
 
         return m_root_link;
     }
 
-    Link                         m_root_link;
-    Snapshot                     m_currentSnapshot;
-    std::shared_ptr< BlockFile > m_dataFile;
-    std::mutex                   m_mutex;
+    Link                                  m_root_link;
+    Snapshot                              m_currentSnapshot;
+    std::map< size_t, TableDataBlockPtr > m_blockMap;
+    std::shared_ptr< BlockFile >          m_dataFile;
+    //std::mutex                            m_mutex;
 };
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -687,12 +1548,12 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::initSnapshots()
                 m_snapshotFile->read( in_data.data(), tc * sizeof( size_t ), curOffset );
                 curOffset += tc * sizeof( size_t );
 
-                snapshot->setId( id );
-                snapshot->setRoot( rt );
+                snapshot->set_id( id );
+                snapshot->set_root( rt );
                 std::copy( in_data.begin(), in_data.begin() + nc,
-                           std::inserter( snapshot->m_newBlocks, snapshot->m_newBlocks.end() ) );
+                           std::inserter( snapshot->m_new_blocks, snapshot->m_new_blocks.end() ) );
                 std::copy( in_data.begin() + nc, in_data.begin() + nc + mc,
-                           std::inserter( snapshot->m_modifiedBlocks, snapshot->m_modifiedBlocks.end() ) );
+                           std::inserter( snapshot->m_modified_blocks, snapshot->m_modified_blocks.end() ) );
                 m_readers.insert( {snapshot, nullptr} );
 
                 if( !m_latestSnapshot || *m_latestSnapshot < *snapshot )
@@ -730,7 +1591,7 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
         const size_t nc = snap->m_newBlocks.size();
         const size_t mc = snap->m_modifiedBlocks.size();
         const size_t tc = nc + mc;
-        const size_t rt = snap->m_rootIndex;
+        const size_t rt = snap->m_root_index;
 
         size_t snapHead[ 5 ] = { id, nc, mc, tc, rt };// id, new count, modified count, total count, root.
         m_snapshotFile->write( &snapHead, 5 * sizeof( size_t ), curOffset );
