@@ -42,19 +42,6 @@
 
 namespace sceneDB {
 
-constexpr size_t get_msb( size_t num )
-{
-    size_t msb{ 1 };
-    while( num >>= 1 )
-        msb++;
-    return msb;
-}
-
-constexpr size_t make_mask( size_t num )
-{
-    return ( size_t( 1 ) << get_msb( num ) ) - 1;
-}
-
 // Forward declarations
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TableWriter;
@@ -110,83 +97,65 @@ bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshot_id
 // If a Link is local, then what it points to is in the same 
 // TableDataBlock as the Node containing the Link.
 // Default-constructed Links are invalid.
-template <size_t BlockSize>
-struct Link
+class Link
 {
-    static constexpr size_t leaf_bit = size_t(1) << (sizeof(size_t) * 8 - 1);
-    static constexpr size_t local_bit = leaf_bit >> 1;
-    static constexpr size_t data_mask = ~(leaf_bit | local_bit);
-    static constexpr size_t local_mask = make_mask(BlockSize);
-    static constexpr size_t block_mask = data_mask & ~local_mask;
-    static constexpr size_t block_shift = get_msb(BlockSize);
-    static constexpr size_t block_limit = (block_mask >> block_shift) + 1;
-
+  private:
     // The two MSBs of Link values are reserved.
     // The highest bit differentiates leaf from interior nodes.
     // The next bit differentiates links within a Block (local) from
     // links to other Blocks.
-    Link() = default;
-    Link( bool leaf, bool local, size_t block, size_t local_address )
-    {
-        OTK_ASSERT( !leaf || local ); // Leaf links must be local
-        set_leaf( leaf );
-        set_local( local );
-        set_block( block );
-        set_local_address( local_address );
-    }
-    Link( const Link& o ) : m_link( o.m_link ) {}
+    unsigned int m_is_leaf : 1;
+    unsigned int m_is_local : 1;
+    unsigned int m_block : 31;
+    unsigned int m_local_address : 31;
 
-    Link& operator=( const Link& o )
-    {
-        m_link = o.m_link;
-        return *this;
-    }
+    static const unsigned int INVALID = 0x7FFFFFF;
 
-    bool is_valid() const { return !( m_link ^ size_t( -1 ) ); }
-    void invalidate() { m_link = static_cast<size_t>( -1 ); }
-
-    bool is_leaf() const { return m_link & leaf_bit; }
-    void set_leaf( bool l )
+  public:
+    Link()
+        : m_is_leaf( 0 )
+        , m_is_local( 0 )
+        , m_block( INVALID )
+        , m_local_address( INVALID )
     {
-        if( l )
-            m_link |= leaf_bit;
-        else
-            m_link &= ~leaf_bit;
     }
 
-    bool is_local() const { return m_link & local_bit; }
-    void set_local( bool l )
+    Link( bool is_leaf, bool is_local, unsigned int block, unsigned int local_address )
+        : m_is_leaf( is_leaf )
+        , m_is_local( is_local )
+        , m_block( block )
+        , m_local_address( local_address )
     {
-        if( l )
-            m_link |= local_bit;
-        else
-            m_link &= ~local_bit;
+        OTK_ASSERT( !m_is_leaf || m_is_local );  // Leaf links must be local
+        OTK_ASSERT( is_valid() );
     }
+
+    bool is_valid() const { return m_block != INVALID || m_local_address != INVALID; }
+    void invalidate()
+    {
+        m_block         = INVALID;
+        m_local_address = INVALID;
+    }
+
+    bool is_leaf() const { return m_is_local; }
+    void set_leaf( bool l ) { m_is_leaf = l; }
+
+    bool is_local() const { return m_is_local; }
+    void set_local( bool l ) { m_is_local = l; }
 
     // Returns the offset within the block at which the data resides.
-    size_t get_local_address() const { return m_link & local_mask; }
-    void set_local_address( size_t v )
-    {
-        OTK_ASSERT( v < BlockSize );
-        m_link = ( m_link & ~local_mask ) | ( v & local_mask );
-    }
+    unsigned int get_local_address() const { return m_local_address; }
+    void set_local_address( size_t v ) { m_local_address = v; }
 
     // Returns the index of the block at which the data resides.
-    size_t get_block() const { return ( m_link & block_mask ) >> block_shift; }
-    void set_block( size_t b )
-    {
-        OTK_ASSERT( b < block_limit );
-        m_link = ( m_link & ~block_mask ) | ( b << block_shift );
-    }
+    unsigned int get_block() const { return m_block; }
+    void set_block( size_t b ) { m_block = b; }
 
     bool operator==( const Link& o ) const
     {
-        return m_link == o.m_link;
+        return m_is_leaf == o.m_is_leaf && m_is_local == o.m_is_local && m_block == o.m_block && m_local_address == o.m_local_address;
     }
-
-    size_t m_link{ static_cast<size_t>( -1 ) };
 };
-
 
 // A Node is a sorted array of unique <Key, Link> pairs.
 // Pairs with equivalent keys are considered equal.
@@ -197,7 +166,6 @@ struct Node
     {
     }
 
-    typedef struct Link<BlockSize> Link;
     typedef std::pair< Key, Link > Pair_T;
 
     // Leaf Nodes hold links that point to Records.
@@ -439,7 +407,6 @@ class TableWriterDataBlock
 public:
     typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
     typedef typename TableType::Node         Node;
-    typedef typename TableType::Node::Link   Link;
     typedef typename TableType::Node::Pair_T Pair_T;
 
     // Runtime metadata required to keep track of allocated
@@ -696,7 +663,6 @@ class TableWriter
 public:
     typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
     typedef typename TableType::Node         Node;
-    typedef typename TableType::Node::Link   Link;
     typedef typename TableType::Node::Pair_T Pair_T;
 
 private:
@@ -821,7 +787,7 @@ bool Node<Key, B, BlockSize>::find( const Key& key, Pair_T* o_pair ) const
 }
 
 template <typename Key, size_t B, size_t BlockSize>
-typename Node<Key, B, BlockSize>::Link Node<Key, B, BlockSize>::traverse( const Key& key ) const
+Link Node<Key, B, BlockSize>::traverse( const Key& key ) const
 {
     if( key <= low_key() )
         return m_pairs[ 0 ].second;
@@ -837,7 +803,7 @@ typename Node<Key, B, BlockSize>::Link Node<Key, B, BlockSize>::traverse( const 
 }
 
 template <typename Key, size_t B, size_t BlockSize>
-typename Node<Key, B, BlockSize>::Link Node<Key, B, BlockSize>::traverse( const Key& key, bool update_low_key )
+Link Node<Key, B, BlockSize>::traverse( const Key& key, bool update_low_key )
 {
     if( update_low_key &&
         key <= low_key() )
@@ -1880,7 +1846,7 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterData
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Link TableWriter<Key, Record, B, BlockSize, BlockAlignment>::get_root_link()
+Link TableWriter<Key, Record, B, BlockSize, BlockAlignment>::get_root_link()
 {
     if( !m_root_link.is_valid() )
     {
