@@ -197,8 +197,8 @@ struct Node
     {
     }
 
-    typedef Link<BlockSize>                 Link;
-    typedef std::pair< Key, typename Link > Pair_T;
+    typedef struct Link<BlockSize> Link;
+    typedef std::pair< Key, Link > Pair_T;
 
     // Leaf Nodes hold links that point to Records.
     bool is_leaf()         const { return m_metadata.is_leaf(); }
@@ -304,7 +304,7 @@ class Table
 public:
     typedef TableWriter<Key, Record, B, BlockSize, BlockAlignment> TableWriterType;
     typedef TableReader<Key, Record, B, BlockSize, BlockAlignment> TableReaderType;
-    typedef Node<Key, B, BlockSize>                                Node;
+    typedef struct Node<Key, B, BlockSize> Node;
 
     Table( const char* directory, const char* tableName )
         : m_tableName( tableName )
@@ -700,8 +700,8 @@ public:
     typedef typename TableType::Node::Pair_T Pair_T;
 
 private:
-    typedef TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment> TableWriterDataBlock;
-    typedef std::shared_ptr<TableWriterDataBlock>                           TableWriterDataBlockPtr;
+  typedef struct TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment> TableWriterDataBlock;
+  typedef std::shared_ptr<TableWriterDataBlock> TableWriterDataBlockPtr;
 
 public:
     TableWriter( std::shared_ptr< BlockFile > data_file, std::shared_ptr< const Snapshot > latest_snapshot )
@@ -1020,9 +1020,9 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
     {
         std::shared_ptr<Snapshot> snap = pair.first;
 
-        const size_t id = snap->m_snapshotId;
-        const size_t nc = snap->m_newBlocks.size();
-        const size_t mc = snap->m_modifiedBlocks.size();
+        const size_t id = snap->m_snapshot_id;
+        const size_t nc = snap->m_new_blocks.size();
+        const size_t mc = snap->m_modified_blocks.size();
         const size_t tc = nc + mc;
         const size_t rt = snap->m_root_index;
 
@@ -1030,11 +1030,11 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
         m_snapshotFile->write( &snapHead, 5 * sizeof( size_t ), curOffset );
         curOffset += 5 * sizeof( size_t );
 
-        std::vector<size_t> blocks( snap->m_newBlocks.begin(), snap->m_newBlocks.end() );
+        std::vector<size_t> blocks( snap->m_new_blocks.begin(), snap->m_new_blocks.end() );
         m_snapshotFile->write( blocks.data(), blocks.size() * sizeof( size_t ), curOffset );
         curOffset += nc * sizeof( size_t );
 
-        blocks.assign( snap->m_modifiedBlocks.begin(), snap->m_modifiedBlocks.end() );
+        blocks.assign( snap->m_modified_blocks.begin(), snap->m_modified_blocks.end() );
         m_snapshotFile->write( blocks.data(), blocks.size() * sizeof( size_t ), curOffset );
         curOffset += mc * sizeof( size_t );
     }
@@ -1902,8 +1902,8 @@ Snapshot&& TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TakeSnaphot()
 
     Snapshot snapshot( std::move( m_currentSnapshot ) );
 
-    m_currentSnapshot.setId( snapshot.m_snapshotId + 1 );
-    m_currentSnapshot.setRoot( snapshot.m_root_index );
+    m_currentSnapshot.set_id( snapshot.m_snapshot_id + 1 );
+    m_currentSnapshot.set_root( snapshot.m_root_index );
 
     m_root_link.invalidate();
 
