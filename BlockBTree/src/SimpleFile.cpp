@@ -106,6 +106,13 @@ SimpleFile::~SimpleFile()
 #endif    
 }
 
+namespace {
+
+void emptyCompletion(DWORD e, DWORD c, OVERLAPPED* o)
+{}
+
+}
+
 void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
 {
     std::lock_guard guard( m_mutex );
@@ -120,7 +127,7 @@ void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
     ol.OffsetHigh = DWORD( offset >> 32 );
     ol.hEvent = NULL;
 
-    auto result = ReadFileEx( m_file, buffer, bytes_to_read, &ol, NULL );
+    auto result = ReadFileEx( m_file, buffer, bytes_to_read, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {
@@ -161,7 +168,7 @@ void SimpleFile::write( const void* buffer, size_t size, offset_t offset ) const
     ol.OffsetHigh = DWORD( offset >> 32 );
     ol.hEvent = NULL;
 
-    auto result = WriteFileEx( m_file, buffer, bytes_to_write, &ol, NULL );
+    auto result = WriteFileEx( m_file, buffer, bytes_to_write, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {

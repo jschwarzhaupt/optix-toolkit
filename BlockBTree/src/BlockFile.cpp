@@ -54,15 +54,17 @@ BlockFile::BlockFile( const std::filesystem::path& path,
 #else
       m_file( -1 )
 #endif
+    , m_path( path )
     , m_blockSize( block_size )
     , m_blockAlignment( block_alignment )
     , m_header( header )
 {
+    OTK_ASSERT( m_header );
     // File permissions
 #ifdef WIN32
     // Try to open file for writing, if requested.
     if( request_write )
-        m_file = CreateFileA( path.string().c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
+        m_file = CreateFileA( m_path.string().c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
 
     if( m_file == INVALID_HANDLE_VALUE )
     {
@@ -71,7 +73,7 @@ BlockFile::BlockFile( const std::filesystem::path& path,
             code == ERROR_SHARING_VIOLATION )
         {
             // Open file read-only if we couldn't open for writing, or writing wasn't requested.
-            m_file = CreateFileA( path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
+            m_file = CreateFileA( m_path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
             if( m_file == INVALID_HANDLE_VALUE )
                 code = GetLastError();
             else
@@ -88,7 +90,7 @@ BlockFile::BlockFile( const std::filesystem::path& path,
 
     // Try to open file for writing, if requested.
     // Check that we can flock() the file exclusively. If not, then open read-only.
-    m_file = open( path.c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
+    m_file = open( m_path.string().c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
     if( m_file < 0 )
     {
         int code = errno;
@@ -111,19 +113,35 @@ BlockFile::BlockFile( const std::filesystem::path& path,
 
     if( m_writeable )
         writeHeader();
+
+    m_valid = true;
 }
 
 BlockFile::~BlockFile()
 {
+    if( m_valid )
+    {
+        if( m_writeable )
+            flush( true );
 #ifdef WIN32
-    CloseHandle( m_file );
+        CloseHandle( m_file );
 #else
-    close( m_file );
+        close( m_file );
 #endif    
+        m_valid = false;
+    }
+}
+
+namespace {
+
+void emptyCompletion(DWORD e, DWORD c, OVERLAPPED* o)
+{}
+
 }
 
 std::shared_ptr<const DataBlock> BlockFile::checkOutForRead( const size_t index )
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to check out block from invalid BlockFile." );
     OTK_ASSERT_MSG( index < m_nextBlock.load() && m_freeBlockIndices.count( index ) == 0, "Attempt to check out an invalid block." );
     OTK_ASSERT_MSG( m_writeBlocks.count( index ) == 0, "Attempt to check out for reading a block already checked out for writing." );
 
@@ -145,7 +163,7 @@ std::shared_ptr<const DataBlock> BlockFile::checkOutForRead( const size_t index 
     ol.OffsetHigh = DWORD( offset >> 32 );
     ol.hEvent = NULL;
 
-    auto result = ReadFileEx( m_file, new_block->get_data(), bytes_to_read, &ol, NULL );
+    auto result = ReadFileEx( m_file, new_block->get_data(), bytes_to_read, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {
@@ -179,6 +197,8 @@ std::shared_ptr<const DataBlock> BlockFile::checkOutForRead( const size_t index 
 
 std::shared_ptr<DataBlock> BlockFile::checkOutForReadWrite( const size_t index )
 {
+    OTK_ASSERT_MSG( m_writeable, "Attempt to check out block for read/write from read-only BlockFile." );
+    OTK_ASSERT_MSG( m_valid, "Attempt to check out block from invalid BlockFile." );
     OTK_ASSERT_MSG( index < m_nextBlock.load() && m_freeBlockIndices.count( index ) == 0, "Attempt to check out an invalid block." );
     OTK_ASSERT_MSG( m_readBlocks.count( index ) == 0, "Attempt to check out for writing a block already checked out for reading." );
 
@@ -200,7 +220,7 @@ std::shared_ptr<DataBlock> BlockFile::checkOutForReadWrite( const size_t index )
     ol.OffsetHigh = DWORD( offset >> 32 );
     ol.hEvent = NULL;
 
-    auto result = ReadFileEx( m_file, new_block->get_data(), bytes_to_read, &ol, NULL );
+    auto result = ReadFileEx( m_file, new_block->get_data(), bytes_to_read, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {
@@ -234,6 +254,7 @@ std::shared_ptr<DataBlock> BlockFile::checkOutForReadWrite( const size_t index )
 
 std::shared_ptr<DataBlock> BlockFile::checkOutNewBlock()
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to check out block from invalid BlockFile." );
     OTK_ASSERT( m_writeable );
 
     size_t block_index;
@@ -281,6 +302,7 @@ std::shared_ptr<DataBlock> BlockFile::checkOutNewBlock()
 
 void BlockFile::flush( bool flush_caches )
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to flush invalid BlockFile." );
     OTK_ASSERT( isWriteable() );
     std::lock_guard guard( m_mutex );
 
@@ -313,6 +335,8 @@ void BlockFile::flush( bool flush_caches )
 
 void BlockFile::unloadBlock( const size_t index )
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to unload block from invalid BlockFile." );
+
     auto r_it = m_readBlocks.find( index );
     if( r_it != m_readBlocks.end() )
     {
@@ -333,12 +357,21 @@ void BlockFile::unloadBlock( const size_t index )
 
 void BlockFile::freeBlock( const size_t index )
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to free block from invalid BlockFile." );
+
     OTK_ASSERT( isWriteable() );
     auto r_it = m_readBlocks.find( index );
     if( r_it != m_readBlocks.end() )
     {
         r_it->second->set_valid( false );
         m_readBlocks.erase( r_it );
+    }
+
+    auto w_it = m_writeBlocks.find( index );
+    if( w_it != m_writeBlocks.end() )
+    {
+        w_it->second->set_valid( false );
+        m_writeBlocks.erase( w_it );
     }
 
     m_freeBlockIndices.insert( index );
@@ -361,7 +394,7 @@ bool BlockFile::checkHeader()
     ol.OffsetHigh = 0;
     ol.hEvent = NULL;
 
-    auto result = ReadFileEx( m_file, file_header_data.data(), bytes_to_read, &ol, NULL );
+    auto result = ReadFileEx( m_file, file_header_data.data(), bytes_to_read, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {
@@ -421,7 +454,7 @@ bool BlockFile::checkHeader()
             ol.OffsetHigh = DWORD( offset >> 32 );
             ol.hEvent = NULL;
 
-            auto result = ReadFileEx( m_file, free_list.data(), size_in_bytes, &ol, NULL );
+            auto result = ReadFileEx( m_file, free_list.data(), size_in_bytes, &ol, emptyCompletion );
             if( result &&
                 SleepEx( INFINITE, true ) == WAIT_IO_COMPLETION )
             {
@@ -477,7 +510,7 @@ void BlockFile::writeHeader() const
         ol.OffsetHigh = 0;
         ol.hEvent = NULL;
 
-        auto result = WriteFileEx( m_file, header_data.data(), bytes_to_write, &ol, NULL );
+        auto result = WriteFileEx( m_file, header_data.data(), bytes_to_write, &ol, emptyCompletion );
         if( !result ||
             SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
         {
@@ -519,7 +552,7 @@ void BlockFile::writeHeader() const
             ol.OffsetHigh = DWORD( offset >> 32 );
             ol.hEvent = NULL;
 
-            result = WriteFileEx( m_file, flat_array.data(), bytes_to_write, &ol, NULL );
+            result = WriteFileEx( m_file, flat_array.data(), bytes_to_write, &ol, emptyCompletion );
             if( !result ||
                 SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
             {
@@ -548,6 +581,8 @@ void BlockFile::writeHeader() const
 
 void BlockFile::writeBlock( std::shared_ptr<DataBlock> block )
 {
+    OTK_ASSERT_MSG( m_valid, "Attempt to write block from invalid BlockFile." );
+
     const offset_t offset = getBlockOffset( block->index );
 
 #ifdef WIN32
@@ -561,7 +596,7 @@ void BlockFile::writeBlock( std::shared_ptr<DataBlock> block )
     ol.OffsetHigh = DWORD( offset >> 32 );
     ol.hEvent = NULL;
 
-    auto result = WriteFileEx( m_file, block->get_data(), bytes_to_write, &ol, NULL );
+    auto result = WriteFileEx( m_file, block->get_data(), bytes_to_write, &ol, emptyCompletion );
     if( !result ||
         SleepEx( INFINITE, true ) != WAIT_IO_COMPLETION )
     {
@@ -584,6 +619,32 @@ void BlockFile::writeBlock( std::shared_ptr<DataBlock> block )
         throw otk::Exception( "BlockFile error writing to file." );
     }
 #endif
+}
+
+void BlockFile::close()
+{
+    OTK_ASSERT_MSG( m_valid, "Attempt to close invalid BlockFile." );
+
+#ifdef WIN32
+    CloseHandle(m_file);
+#else
+    close(m_file);
+#endif    
+    m_valid = false;
+
+    m_writeBlocks.clear();
+    m_readBlocks.clear();
+    m_freeBlockIndices.clear();
+}
+
+void BlockFile::destroy()
+{
+    OTK_ASSERT_MSG( m_valid, "Attempt to destroy invalid BlockFile." );
+    OTK_ASSERT_MSG( m_writeable, "Attempt to destroy a read-only BlockFile." );
+
+    close();
+
+    std::filesystem::remove( m_path );
 }
 
 }  // namespace sceneDB

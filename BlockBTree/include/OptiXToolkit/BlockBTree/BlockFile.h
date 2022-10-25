@@ -126,7 +126,7 @@ public:
     /// checked out for writing are flushed to disk. All checked out blocks are invalidated.
     ~BlockFile();
 
-    bool exists( const size_t index ) { return index < m_nextBlock; }
+    bool exists( const size_t index ) { return index < m_nextBlock && m_freeBlockIndices.count( index ) == 0; }
 
     /// Check out a block for read-only access.
     /// Blocks may only be checked out for read-only OR read/write access, not both.
@@ -148,7 +148,7 @@ public:
 
     /// Check out the next available block for read/write access.
     /// This can be a new block appended to the end of the file,
-    /// or a previously 
+    /// or a previously freed block if one is available.
     std::shared_ptr<DataBlock> checkOutNewBlock();
 
     /// Write all checked out read/write blocks to disk and update the header. 
@@ -169,6 +169,14 @@ public:
 
     /// Returns whether the file was opened with write access.
     bool isWriteable() const { return m_writeable;  }
+
+    /// Closes the file and invalidates the BlockFile object.
+    void close();
+
+    /// Closes the file and erases it from disk.
+    void destroy();
+
+    bool isValid() const { return m_valid; }
 
     /// Copying is prohibited.
     BlockFile(const BlockFile&) = delete;
@@ -197,12 +205,14 @@ private:
     std::map<size_t, std::shared_ptr<const DataBlock>>  m_readBlocks;
     std::set<size_t>                                    m_freeBlockIndices;
 
-    const size_t            m_blockSize;
-    const size_t            m_blockAlignment;
-    bool                    m_writeable{ false };
-    std::mutex              m_mutex;
-    std::atomic<size_t>     m_nextBlock{ 0 };
-    std::shared_ptr<Header> m_header;
+    const std::filesystem::path m_path;
+    const size_t                m_blockSize;
+    const size_t                m_blockAlignment;
+    bool                        m_writeable{ false };
+    std::mutex                  m_mutex;
+    std::atomic<size_t>         m_nextBlock{ 0 };
+    std::shared_ptr<Header>     m_header;
+    bool                        m_valid{ false };
 };
 
 }  // namespace sceneDB

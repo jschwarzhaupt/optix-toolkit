@@ -42,6 +42,7 @@ TEST_F(TestDataBlock, TestCreateDestroy)
     EXPECT_EQ( 128, block.size );
     EXPECT_EQ( 0, block.index );
     EXPECT_NE( nullptr, block.get_data() );
+    EXPECT_EQ( 0, (unsigned long long)(block.get_data()) & 3 );
     EXPECT_FALSE( block.is_valid() );
 }
 
@@ -53,4 +54,19 @@ TEST_F(TestDataBlock, TestCopy)
     DataBlock block2( 128, 4, 0 );
     block2 = block1;
     EXPECT_STREQ( reinterpret_cast<const char*>( block1.get_data() ), reinterpret_cast<const char*>( block2.get_data() ) );
+    EXPECT_TRUE( block2.is_valid() );
+    EXPECT_FALSE( block1.is_valid() );
+}
+
+TEST_F(TestDataBlock, TestAlignment)
+{
+    size_t alignment[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+    for( size_t i = 0; i < 8; ++i )
+    {
+        DataBlock block( 512, alignment[ i ], i );
+        EXPECT_EQ( 512, block.size );
+        EXPECT_EQ( i, block.index );
+        EXPECT_NE( nullptr, block.get_data() );
+        EXPECT_EQ( 0, (unsigned long long)(block.get_data()) & ( alignment[ i ] - 1 ) );
+    }
 }
