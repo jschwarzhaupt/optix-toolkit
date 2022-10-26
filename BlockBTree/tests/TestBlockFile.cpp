@@ -49,7 +49,7 @@ TEST_F(TestBlockFile, TestHeader)
     EXPECT_EQ( 0, header.m_freeListSize );
 }
 
-TEST_F(TestBlockFile, TestCreateWriteable)
+TEST_F(TestBlockFile, TestCreateDestroyWriteable)
 {
     if( std::filesystem::exists( k_filename ) )
         std::filesystem::remove( k_filename );

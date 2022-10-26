@@ -50,12 +50,13 @@ SimpleFile::SimpleFile( const std::filesystem::path& path, const bool request_wr
 #else
       m_file( -1 )
 #endif
+    , m_path( path )
 {
     // File permissions
 #ifdef WIN32
     // Try to open file for writing, if requested.
     if( request_write )
-        m_file = CreateFileA( path.string().c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
+        m_file = CreateFileA( m_path.string().c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
 
     if( m_file == INVALID_HANDLE_VALUE )
     {
@@ -64,7 +65,7 @@ SimpleFile::SimpleFile( const std::filesystem::path& path, const bool request_wr
             code == ERROR_SHARING_VIOLATION )
         {
             // Open file read-only if we couldn't open for writing, or writing wasn't requested.
-            m_file = CreateFileA( path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
+            m_file = CreateFileA( m_path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr );
             if( m_file == INVALID_HANDLE_VALUE )
                 code = GetLastError();
             else
@@ -81,7 +82,7 @@ SimpleFile::SimpleFile( const std::filesystem::path& path, const bool request_wr
 
     // Try to open file for writing, if requested.
     // Check that we can flock() the file exclusively. If not, then open read-only.
-    m_file = open( path.c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
+    m_file = open( m_path.c_str(), (request_write ? O_RDWR : O_RDONLY) | O_CREAT, mode );
     if( m_file < 0 )
     {
         int code = errno;
@@ -95,15 +96,12 @@ SimpleFile::SimpleFile( const std::filesystem::path& path, const bool request_wr
             m_writeable = true;
     }
 #endif
+    m_valid = true;
 }
 
 SimpleFile::~SimpleFile()
 {
-#ifdef WIN32
-    CloseHandle( m_file );
-#else
-    close( m_file );
-#endif    
+    close();
 }
 
 namespace {
@@ -115,6 +113,7 @@ void emptyCompletion(DWORD e, DWORD c, OVERLAPPED* o)
 
 void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
 {
+    OTK_ASSERT_MSG( isValid(), "Attempt to read from an invalid SimpleFile." );
     std::lock_guard guard( m_mutex );
 #ifdef WIN32
     OTK_ASSERT( m_file != INVALID_HANDLE_VALUE );
@@ -155,6 +154,8 @@ void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
 
 void SimpleFile::write( const void* buffer, size_t size, offset_t offset ) const
 {
+    OTK_ASSERT_MSG( isWriteable(), "Attempt to write to a read-only SimpleFile." );
+    OTK_ASSERT_MSG( isValid(), "Attempt to write to an invalid SimpleFile." );
     std::lock_guard guard( m_mutex );
 
 #ifdef WIN32
@@ -191,6 +192,29 @@ void SimpleFile::write( const void* buffer, size_t size, offset_t offset ) const
         throw otk::Exception( "Error writing to file." );
     }
 #endif
+}
+
+void SimpleFile::close()
+{
+    if( m_valid )
+    {
+#ifdef WIN32
+        CloseHandle(m_file);
+#else
+        close(m_file);
+#endif    
+        m_valid = false;
+    }
+}
+
+void SimpleFile::destroy()
+{
+    OTK_ASSERT_MSG( m_valid, "Attempt to destroy invalid SimpleFile." );
+    OTK_ASSERT_MSG( m_writeable, "Attempt to destroy a read-only SimpleFile." );
+
+    close();
+
+    std::filesystem::remove( m_path );
 }
 
 }  // namespace sceneDB

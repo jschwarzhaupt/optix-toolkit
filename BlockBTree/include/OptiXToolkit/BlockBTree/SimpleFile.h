@@ -72,6 +72,14 @@ public:
     /// Returns whether the file was opened with write access.
     bool isWriteable() const { return m_writeable;  }
 
+    /// Closes the file and invalidates the BlockFile object.
+    void close();
+
+    /// Closes the file and erases it from disk.
+    void destroy();
+
+    bool isValid() const { return m_valid; }
+
     /// Copying is prohibited.
     SimpleFile(const SimpleFile&) = delete;
 
@@ -86,8 +94,10 @@ private:
     int                 m_file;
 #endif
 
-    bool                m_writeable{ false };
-    mutable std::mutex  m_mutex;
+    const std::filesystem::path m_path;
+    bool                        m_writeable{ false };
+    mutable std::mutex          m_mutex;
+    bool                        m_valid{ false };
 };
 
 }  // namespace sceneDB

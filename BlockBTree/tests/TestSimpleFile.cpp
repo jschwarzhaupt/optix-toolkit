@@ -27,6 +27,7 @@
 //
 
 #include <OptiXToolkit/BlockBTree/SimpleFile.h>
+#include <OptiXToolkit/Util/Exception.h>
 
 #include <gtest/gtest.h>
 
@@ -36,41 +37,76 @@ class TestSimpleFile : public testing::Test
 {
 };
 
-TEST_F(TestSimpleFile, TestCreateDestroy)
+constexpr char* k_filename = "test_simplefile.dat";
+
+TEST_F(TestSimpleFile, TestCreateDestroyWriteable)
 {
     {
-        SimpleFile file( "test.dat", true );
+        SimpleFile file( k_filename, true );
         EXPECT_TRUE( file.isWriteable() );
+        EXPECT_TRUE( file.isValid() );
+        file.destroy();
+        EXPECT_FALSE( file.isValid() );
+        EXPECT_FALSE( std::filesystem::exists( k_filename ) );
     }
-    std::filesystem::remove( "test.dat" );
+}
+
+TEST_F(TestSimpleFile, TestCreateDestroyReadOnly)
+{
+    {
+        SimpleFile file( k_filename, false );
+        EXPECT_FALSE( file.isWriteable() );
+        EXPECT_TRUE( file.isValid() );
+        EXPECT_THROW( file.destroy(), otk::Exception );
+    }
+    EXPECT_TRUE( std::filesystem::exists( k_filename ) );
+    std::filesystem::remove( k_filename );
 }
 
 TEST_F(TestSimpleFile, TestWriteCloseRead)
 {
     const char data[] = "Hello, world!";
     {
-        SimpleFile file( "test.dat", true );
+        SimpleFile file( k_filename, true );
         file.write( data, sizeof( data ), 0 );
     }
     {
-        SimpleFile file( "test.dat", false );
+        SimpleFile file( k_filename, false );
         char buffer[sizeof( data )];
         file.read( buffer, sizeof( buffer ), 0 );
         EXPECT_STREQ( data, buffer );
+        EXPECT_THROW( file.destroy(), otk::Exception );
     }
-    std::filesystem::remove( "test.dat" );
+    std::filesystem::remove( k_filename );
 }
 
 TEST_F(TestSimpleFile, TestWriteNoCloseRead)
 {
     const char data[] = "Hello, world!";
     {
-        SimpleFile file( "test.dat", true );
+        SimpleFile file( k_filename, true );
         file.write( data, sizeof( data ), 0 );
 
         char buffer[sizeof( data )];
         file.read( buffer, sizeof( buffer ), 0 );
         EXPECT_STREQ( data, buffer );
     }
-    std::filesystem::remove( "test.dat" );
+    std::filesystem::remove( k_filename );
+}
+
+TEST_F(TestSimpleFile, TestWriteCloseReadOffset)
+{
+    const char data[] = "Hello, world!";
+    {
+        SimpleFile file( k_filename, true );
+        file.write( data, sizeof( data ), 1350 );
+    }
+    {
+        SimpleFile file( k_filename, false );
+        char buffer[sizeof( data )];
+        file.read( buffer, sizeof( buffer ), 1350 );
+        EXPECT_STREQ( data, buffer );
+        EXPECT_THROW( file.destroy(), otk::Exception );
+    }
+    std::filesystem::remove( k_filename );
 }
