@@ -1181,8 +1181,8 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
         while( m_metaData.m_free_records.count( m_metaData.m_next_record + sizeof( Record ) ) )
         {
             // Advance through contiguous free space.
-            m_metaData.m_next_record += sizeof( Record );
-            m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record ) );
+            m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record + sizeof( Record ) ) );
+            m_metaData.m_next_record += sizeof(Record);
         }
     }
 
@@ -1198,7 +1198,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
             !node( offset )->is_leaf() )
             continue;
 
-        for( auto it = remap.begin(); it != remap.end(); ++it )
+        for( auto it = remap.begin(); it != remap.end(); )
         {
             Link link_old( true, true, index(), it->first );
 
@@ -1208,6 +1208,8 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
                 node( offset )->update_link( link_old, link_new );
                 it = remap.erase( it );
             }
+            else
+                ++it;
         }
     }
 }

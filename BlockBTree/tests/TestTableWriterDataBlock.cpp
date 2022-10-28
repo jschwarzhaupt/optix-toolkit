@@ -50,6 +50,7 @@ public:
     void SetUp()
     { 
         m_dataBlock = std::make_shared< DataBlock >( k_blockSize, k_blockAlignment, k_blockIndex );
+        m_dataBlock->set_valid( true );
         m_block.reset( new BlockT( m_dataBlock ) );
         m_block->init( m_snapshot );
     }
@@ -349,7 +350,7 @@ TEST_F(TestTableWriterDataBlock, TestCompactRecords)
         if( i & 1 )
         {
             BlockT::Node* node = ( i < 2 * k_branchingFactor ) ? node_0 : node_1;
-            uint32_t index = ( i - 1 ) % k_branchingFactor;
+            uint32_t index = ( ( i - 1 ) / 2 ) % k_branchingFactor;
             BlockT::Pair_T pair = node->get_pair( index );
             KeyT key = pair.first;
 
@@ -364,6 +365,75 @@ TEST_F(TestTableWriterDataBlock, TestCompactRecords)
             RecordT record = m_block->record( link.get_local_address() );
 
             EXPECT_EQ( records[ i ], record );
+        }
+    }
+}
+
+TEST_F(TestTableWriterDataBlock, TestMigrateSubtree)
+{
+    BlockT::Node* node_0 = m_block->node( 0 );
+    uint32_t offset_node_1 = m_block->add_node();
+    BlockT::Node* node_1 = m_block->node( offset_node_1 );
+
+    uint32_t record_offsets[ 2 * k_branchingFactor ];
+    RecordT records[ 2 * k_branchingFactor ];
+    KeyT keys[ 2 * k_branchingFactor ];
+
+    for( uint32_t i = 0; i < 2 * k_branchingFactor; ++i )
+    {
+        uint32_t offset = m_block->add_record( RecordT(3 * i) );
+        BlockT::Link link( true, true, m_block->index(), offset );
+        if( i & 1 )
+            node_0->insert( { KeyT(5 * i), link } );
+        else
+            node_1->insert( { KeyT(5 * i), link } );
+    }
+
+    m_block->add_root( offset_node_1 );
+
+    std::shared_ptr< DataBlock > dataBlock_1 = std::make_shared< DataBlock >( k_blockSize, k_blockAlignment, k_blockIndex+1 );
+    dataBlock_1->set_valid(true);
+    std::shared_ptr< BlockT > block_1( new BlockT(dataBlock_1) );
+    block_1->init(m_snapshot);
+
+    {
+        BlockT::Node* b1_n0 = block_1->node( 0 );
+        uint32_t offset = block_1->add_record( RecordT(999) );
+        BlockT::Link link( true, true, block_1->index(), offset );
+        b1_n0->insert( { KeyT( 99 ), link } );
+    }
+
+    size_t total_free_bytes_before_0 = m_block->total_free_bytes();
+    size_t total_free_bytes_before_1 = block_1->total_free_bytes();
+
+    uint32_t root_offset = m_block->migrate_subtree( offset_node_1, block_1 );
+
+    EXPECT_NE( 0, root_offset );
+    EXPECT_EQ( total_free_bytes_before_0 + total_free_bytes_before_1, m_block->total_free_bytes() + block_1->total_free_bytes() );
+    EXPECT_LT( total_free_bytes_before_0, m_block->total_free_bytes() );
+    EXPECT_GT( total_free_bytes_before_1, block_1->total_free_bytes() );
+    EXPECT_TRUE( block_1->is_root( root_offset ) );
+    EXPECT_FALSE( m_block->is_root( offset_node_1 ) );
+
+    node_1 = block_1->node( root_offset );
+
+    for( uint32_t i = 0; i < 2 * k_branchingFactor; ++i )
+    {
+        if( i & 1 )
+        {
+            uint32_t index = (i - 1) / 2;
+            BlockT::Pair_T pair = node_0->get_pair( index );
+            EXPECT_EQ( KeyT(5 * i), pair.first );
+            EXPECT_EQ( m_block->index(), pair.second.get_block() );
+            EXPECT_EQ( RecordT(3 * i), m_block->record( pair.second.get_local_address() ) );
+        }
+        else
+        {
+            uint32_t index = i / 2;
+            BlockT::Pair_T pair = node_1->get_pair( index );
+            EXPECT_EQ( KeyT(5 * i), pair.first );
+            EXPECT_EQ( block_1->index(), pair.second.get_block() );
+            EXPECT_EQ( RecordT(3 * i), block_1->record( pair.second.get_local_address() ) );
         }
     }
 }
