@@ -30,9 +30,10 @@ include( ../../CMake/FetchGtest.cmake )
 
 add_executable( testBlockBTree
   main.cpp
-  TestBlockFile.cpp
   TestDataBlock.cpp
+  TestBlockFile.cpp
   TestSimpleFile.cpp
+  TestTableWriterDataBlock.cpp
   TestTable.cpp
   )  
 

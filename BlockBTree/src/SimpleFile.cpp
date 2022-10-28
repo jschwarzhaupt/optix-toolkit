@@ -209,10 +209,10 @@ void SimpleFile::close()
 
 void SimpleFile::destroy()
 {
-    OTK_ASSERT_MSG( m_valid, "Attempt to destroy invalid SimpleFile." );
     OTK_ASSERT_MSG( m_writeable, "Attempt to destroy a read-only SimpleFile." );
 
-    close();
+    if( m_valid )
+        close();
 
     std::filesystem::remove( m_path );
 }

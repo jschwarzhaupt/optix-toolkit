@@ -639,10 +639,10 @@ void BlockFile::close()
 
 void BlockFile::destroy()
 {
-    OTK_ASSERT_MSG( m_valid, "Attempt to destroy invalid BlockFile." );
     OTK_ASSERT_MSG( m_writeable, "Attempt to destroy a read-only BlockFile." );
 
-    close();
+    if( m_valid )
+        close();
 
     std::filesystem::remove( m_path );
 }

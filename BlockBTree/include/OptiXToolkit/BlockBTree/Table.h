@@ -95,13 +95,13 @@ struct Snapshot
     bool is_new( const size_t index ) const      { return m_new_blocks.count( index ) != 0; }
     bool is_modified( const size_t index ) const { return m_modified_blocks.count( index ) != 0; }
 
-    size_t           m_snapshot_id;
-    size_t           m_root_index;
+    size_t           m_snapshot_id{ 0 };
+    size_t           m_root_index{ 0 };
     std::set<size_t> m_new_blocks;
     std::set<size_t> m_modified_blocks;
 };
 
-bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshot_id < r.m_snapshot_id; }
+inline bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshot_id < r.m_snapshot_id; }
 
 
 // A Link encodes information about where to find data and
@@ -142,8 +142,8 @@ struct Link
         return *this;
     }
 
-    bool is_valid() const { return !( m_link ^ size_t( -1 ) ); }
-    void invalidate() { m_link = static_cast<size_t>( -1 ); }
+    bool is_valid() const { return m_link != ~0ull; }
+    void invalidate() { m_link = ~0ull; }
 
     bool is_leaf() const { return m_link & leaf_bit; }
     void set_leaf( bool l )
@@ -184,7 +184,7 @@ struct Link
         return m_link == o.m_link;
     }
 
-    size_t m_link{ static_cast<size_t>( -1 ) };
+    size_t m_link{ ~0ull };
 };
 
 
@@ -461,7 +461,7 @@ public:
     // RootData is stored within the block itself.
     struct RootData
     {
-        void add_root( uint32_t offset ) { m_root_offsets[ m_root_count++ ] = offset; }
+        void add_root( uint32_t offset ) { OTK_ASSERT( m_root_count < B ); m_root_offsets[ m_root_count++ ] = offset; }
         void delete_root( uint32_t offset )
         {
             for( uint32_t i = 0; i < m_root_count; ++i )
@@ -505,10 +505,10 @@ public:
     // Reset the pointer to the DataBlock so that it can be freed from memory.
     // This avoids destroying the Metadata, which would otherwise need to be
     // recreated if the DataBlock is then loaded again.
-    void release() { m_dataBlock.reset(); }
+    void release() { m_dataBlock.reset(); m_valid = false; }
 
-    // A TableDataBlock is valid if it holds a non-null DataBlock.
-    bool is_valid() const { return bool( m_dataBlock.get() ); }
+    // A TableDataBlock is valid if it's been initialized and holds a non-null DataBlock.
+    bool is_valid() const { return m_valid && bool( m_dataBlock.get() ); }
 
     // Set the pointer to the DataBlock so it points to 'data'.
     // The DataBlock must have the same index (ie, be the same)
@@ -607,7 +607,7 @@ public:
     // For blocks holding Records, it is considered full if
     // there is not enough space to store the larger of an
     // additional Node or an additional Record.
-    bool is_full() const { return total_free_bytes() >= ( m_metaData.m_record_count ? std::max( sizeof( Node ), sizeof( Record ) ) : sizeof( Node ) ); }
+    bool is_full() const { return total_free_bytes() < ( m_metaData.m_record_count ? std::max( sizeof( Node ), sizeof( Record ) ) : sizeof( Node ) ); }
 
     // Allocate a new Node in the block.
     // Returns the offset to the new Node if successfull, uint32_t( -1 ) otherwise.
@@ -616,8 +616,8 @@ public:
     // Remove the Node at offset and add its space to the free list.
     void remove_node( const uint32_t offset );
 
-    Node* node( const size_t offset )             { OTK_ASSERT( offset < m_metaData.m_next_node ); return node_ptr( offset ); }
-    const Node* node( const size_t offset ) const { OTK_ASSERT( offset < m_metaData.m_next_node ); return node_ptr( offset ); }
+    Node* node( const size_t offset )             { OTK_ASSERT( validate_node_offset( offset ) ); return node_ptr( offset ); }
+    const Node* node( const size_t offset ) const { OTK_ASSERT( validate_node_offset( offset ) ); return node_ptr( offset ); }
 
     // Allocate a new Record in the block.
     // Returns the offset to the new Record if successfull, uint32_t( -1 ) otherwise.
@@ -626,8 +626,8 @@ public:
     // Remove the Record at offset and add its space to the free list.
     void remove_record( const uint32_t offset );
 
-    Record& record( const size_t offset )             { OTK_ASSERT( offset >= m_metaData.m_next_record ); return *record_ptr( offset ); }
-    const Record& record( const size_t offset ) const { OTK_ASSERT( offset >= m_metaData.m_next_record ); return *record_ptr( offset ); }
+    Record& record( const size_t offset )             { OTK_ASSERT( validate_record_offset( offset ) ); return *record_ptr( offset ); }
+    const Record& record( const size_t offset ) const { OTK_ASSERT( validate_record_offset( offset ) ); return *record_ptr( offset ); }
 
     // Record that the Node at offset is a root of the block.
     void add_root( const uint32_t offset );
@@ -673,11 +673,15 @@ private:
     Record*       record_ptr( const size_t offset )       { return reinterpret_cast< Record* >( ptr() + offset ); }
     const Record* record_ptr( const size_t offset ) const { return reinterpret_cast< const Record* >( ptr() + offset ); }
 
+    bool validate_node_offset( const size_t offset ) const   { return ( offset <= m_metaData.m_next_node - sizeof(Node) ) && ( offset % sizeof(Node) == 0 ); }
+    bool validate_record_offset( const size_t offset ) const { return ( offset >= m_metaData.m_next_record + sizeof(Record) ) && ( offset <= record_offset() ) && ( offset % alignof(Record) == 0 ); }
+
     size_t& snapshot_id() { return *snap_id_ptr(); }
 
     std::shared_ptr< DataBlock > m_dataBlock;
     Metadata                     m_metaData;
     size_t                       m_index;
+    bool                         m_valid{ false };
 };
 
 
@@ -1074,14 +1078,17 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::close()
 {
     std::unique_lock<std::mutex> lock( m_mutex );
     m_writer.reset();
-    m_readers.clear();    
+    m_readers.clear();
+    m_dataFile->close();
+    m_snapshotFile->close();
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void Table< Key, Record, B, BlockSize, BlockAlignment >::destroy()
 {
     close();
-    std::filesystem::remove_all( m_directory );
+    m_dataFile->destroy();
+    m_snapshotFile->destroy();
 }
 
 
@@ -1221,7 +1228,7 @@ uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_no
         m_metaData.m_next_node += sizeof(Node);
     }
 
-    if (result >= 0)
+    if( result >= 0 )
     {
         new (node(result)) Node();
     }
@@ -1232,9 +1239,13 @@ uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_no
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_node( const uint32_t offset )
 {
+    OTK_ASSERT( validate_node_offset( offset ) );
     OTK_ASSERT( offset < usable_size() );
     if( offset >= m_metaData.m_next_node )
         return;
+
+    if( is_root( offset ) )
+        remove_root( offset );
 
     // Easy case - removing the last Node. Instead of adding
     // to the free list, shift back the offset to the next available
@@ -1283,6 +1294,7 @@ uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_re
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_record( const uint32_t offset )
 {
+    OTK_ASSERT( validate_record_offset( offset ) );
     OTK_ASSERT( offset < usable_size() );
     if( offset <= m_metaData.m_next_record )
         return;
@@ -1293,7 +1305,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_rec
     // Easy case - removing the last Record. Instead of adding
     // to the free list, shift forward the offset to the next available
     // Record to reclaim the free space immediately.
-    if( m_metaData.m_next_record - sizeof( Record ) == offset )
+    if( m_metaData.m_next_record + sizeof( Record ) == offset )
     {
         m_metaData.m_next_record += sizeof( Record );
         // Coalesce free space at the end.
@@ -1310,6 +1322,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_rec
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_root( const uint32_t offset )
 {
+    OTK_ASSERT( validate_node_offset( offset ) );
     auto rd = root_data_ptr();
     OTK_ASSERT( rd->m_root_count < B );
     rd->m_root_offsets[ rd->m_root_count++ ] = offset;
@@ -1318,6 +1331,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_root( 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_root( const uint32_t offset )
 {
+    OTK_ASSERT( validate_node_offset( offset ) );
     auto rd = root_data_ptr();
     uint32_t index = ~0u;
     for( uint32_t i = 0; i < rd->m_root_count; ++i )
@@ -1413,12 +1427,12 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init( cons
 {
     set_snapshot( snapshot );
     new ( root_data_ptr() ) RootData();
+    m_metaData.m_next_record = record_offset();
 
     auto offset = add_node();
     OTK_ASSERT( offset == 0 );
     add_root( offset );
-
-    m_metaData.m_next_record = record_offset();
+    m_valid = true;
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -1460,8 +1474,11 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init_exist
     }
 
     OTK_ASSERT( nodes.size() );
-    m_metaData.m_next_node   = *nodes.rbegin() + sizeof( Node );
-    m_metaData.m_next_record = *records.begin() - sizeof( Record );
+    m_metaData.m_next_node = *nodes.rbegin() + sizeof( Node );
+    if( records.size() )
+        m_metaData.m_next_record = *records.begin() - sizeof( Record );
+    else
+        m_metaData.m_next_record = record_offset();
 
     // Now, add any holes in the set of valid Nodes
     // as free Nodes.
@@ -1478,16 +1495,21 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init_exist
 
     // Add any holes in the set of valid Records
     // as free Records.
-    curr = *records.begin();
-    for( uint32_t offset : records )
+    if( records.size() )
     {
-        while( curr < offset )
+        curr = *records.begin();
+        for( uint32_t offset : records )
         {
-            m_metaData.m_free_records.insert( curr );
+            while( curr < offset )
+            {
+                m_metaData.m_free_records.insert( curr );
+                curr += sizeof( Record );
+            }
             curr += sizeof( Record );
         }
-        curr += sizeof( Record );
     }
+
+    m_valid = true;
 }
 
 
