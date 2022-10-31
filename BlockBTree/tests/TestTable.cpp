@@ -30,7 +30,13 @@
 
 #include <gtest/gtest.h>
 
-using TableT = sceneDB::Table</*Key=*/int, /*Record=*/int, /*B=*/2, /*BlockSize=*/4096, /*BlockAlignment=*/4>;
+using namespace sceneDB;
+constexpr size_t k_branchingFactor = 4;
+constexpr size_t k_blockSize = 4096;
+constexpr size_t k_blockAlignment = 8;
+using RecordT = int;
+using KeyT = size_t;
+using TableT = Table</*Key=*/KeyT, /*Record=*/RecordT, /*B=*/k_branchingFactor, /*BlockSize=*/k_blockSize, /*BlockAlignment=*/k_blockAlignment>;
 
 class TestTable : public testing::Test
 {
@@ -40,7 +46,14 @@ TEST_F(TestTable, TestCreate)
 {
     TableT table( "test_table", "TestTable" );
     table.init( /*request_write=*/true );
+
+    EXPECT_TRUE( std::filesystem::exists( table.getDataFile() ) );
+    EXPECT_TRUE( std::filesystem::exists( table.getSnapshotFile() ) );
+
     table.destroy();
+
+    EXPECT_FALSE( std::filesystem::exists( table.getDataFile() ) );
+    EXPECT_FALSE( std::filesystem::exists( table.getSnapshotFile() ) );
 }
 
 TEST_F(TestTable, TestInsert)
@@ -51,6 +64,5 @@ TEST_F(TestTable, TestInsert)
 
     writer->Insert( 1, 1 );
 
-    writer.reset();
     table.destroy();
 }

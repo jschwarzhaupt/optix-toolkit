@@ -82,8 +82,9 @@ struct Snapshot
     Snapshot( Snapshot&& o ) noexcept
         : m_snapshot_id( o.m_snapshot_id)
         , m_root_index( o.m_root_index)
-        , m_new_blocks( std::move( o.m_new_blocks) )
-        , m_modified_blocks( std::move( o.m_modified_blocks) )
+        , m_root_local_offset( o.m_root_local_offset )
+        , m_new_blocks( std::move( o.m_new_blocks ) )
+        , m_modified_blocks( std::move( o.m_modified_blocks ) )
     {
         o.m_snapshot_id = ~0ull;
         o.m_root_index = ~0ull;
@@ -91,12 +92,14 @@ struct Snapshot
 
     void set_id( const size_t id ) { m_snapshot_id = id; }
     void set_root( const size_t root ) { m_root_index = root; }
+    void set_root_local_offset( const size_t offset ) { m_root_local_offset = offset; }
 
     bool is_new( const size_t index ) const      { return m_new_blocks.count( index ) != 0; }
     bool is_modified( const size_t index ) const { return m_modified_blocks.count( index ) != 0; }
 
     size_t           m_snapshot_id{ 0 };
     size_t           m_root_index{ 0 };
+    size_t           m_root_local_offset{ 0 };
     std::set<size_t> m_new_blocks;
     std::set<size_t> m_modified_blocks;
 };
@@ -247,9 +250,9 @@ struct Node
 
     // Search this node, which must be a leaf, for
     // a pair having key as it's Key.
-    // If such a pair is found, copy it to o_pair.
+    // If such a pair is found, copy the link to o_link.
     // Returns true if found, false otherwise.
-    bool find( const Key& key, Pair_T* o_pair ) const;
+    bool find( const Key& key, Link& o_link ) const;
 
     // Search this node for the pair having the
     // largest Key that is smaller or equal to the
@@ -505,7 +508,7 @@ public:
     // Reset the pointer to the DataBlock so that it can be freed from memory.
     // This avoids destroying the Metadata, which would otherwise need to be
     // recreated if the DataBlock is then loaded again.
-    void release() { m_dataBlock.reset(); m_valid = false; }
+    void release() { m_dataBlock.reset(); }
 
     // A TableDataBlock is valid if it's been initialized and holds a non-null DataBlock.
     bool is_valid() const { return m_valid && bool( m_dataBlock.get() ); }
@@ -748,7 +751,7 @@ private:
     // Split may not succeed if the block needs to be split,
     // in which case traversal needs to be restarted from the
     // block's parent (as nodes can move).
-    bool split_node(TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link);
+    bool split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link );
 
     // Copies the block at offset block_index into a new block.
     // Returns the offset for the new block.
@@ -774,6 +777,82 @@ private:
     Link                                        m_root_link;
     Snapshot                                    m_currentSnapshot;
     std::map< size_t, TableWriterDataBlockPtr > m_blockMap;
+    std::shared_ptr< BlockFile >                m_dataFile;
+};
+
+// TableReaderDataBlock is a wrapper class around a BlockFile::DataBlock.
+// It provides the high-level functionality needed to query the Table.
+// In particular, blocks store metadata, Nodes and Records.
+// Nodes are allocated within a block starting at its lowest address,
+// with subsequent Nodes allocated at increasingly higher addresses.
+// The metadata is stored at the very end of the block.
+// Records are allocated starting at the highest address prior to the
+// metadata section, and their offsets decrease for subsequent Records.
+// The Reader doesn't need any of the metadata so it's not loaded.
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+class TableReaderDataBlock
+{
+public:
+    typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
+    typedef typename TableType::Node Node;
+        
+    TableReaderDataBlock( std::shared_ptr< const DataBlock >& data )
+        : m_data( ( const char* )( data->get_data() ) )
+    {
+        OTK_ASSERT( data->size == BlockSize );
+    }
+
+    const Node*   node( const size_t offset ) const   { return node_ptr( offset ); }
+    const Record& record( const size_t offset ) const { return *record_ptr( offset ); }
+
+private:
+    const Node*   node_ptr( const size_t offset ) const   { return reinterpret_cast< const Node* >( m_data + offset ); }
+    const Record* record_ptr( const size_t offset ) const { return reinterpret_cast< const Record* >( m_data + offset ); }
+
+    const char* m_data;
+};
+
+// A TableReader is a helper class that can query Tables.
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+class TableReader
+{
+    static constexpr size_t key_size    = sizeof( Key );
+    static constexpr size_t record_size = sizeof( Record );
+
+public:
+    typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
+    typedef typename TableType::Node         Node;
+    typedef typename TableType::Node::Link   Link;
+    typedef typename TableType::Node::Pair_T Pair_T;
+
+private:
+  typedef struct TableReaderDataBlock<Key, Record, B, BlockSize, BlockAlignment> TableReaderDataBlock;
+
+public:
+    TableReader( std::shared_ptr< BlockFile > data_file,
+                 const size_t                 root_index,
+                 const size_t                 root_local_offset )
+        : m_dataFile( data_file )
+        , m_root_link( false, false, root_index, root_local_offset )
+    {}
+
+    // Query the table for Key 'key'.
+    // If it exists, it's value is written to 'record' and returns true.
+    // Otherwise, returns false.
+    bool Query( const Key& key, Record& record );
+
+    // No copying
+    TableReader( const TableReader& o ) = delete;
+    
+private:
+    // Fetch the block at the given offset.
+    // If the block has already been loaded, this returns immediately.
+    // Otherwise, the block is loaded from disk.
+    // Returns a pointer to the block.
+    TableReaderDataBlock get_block( size_t index );
+
+    const Link                                  m_root_link;
+    std::map< size_t, TableReaderDataBlock >    m_blockMap;
     std::shared_ptr< BlockFile >                m_dataFile;
 };
 
@@ -807,7 +886,7 @@ void Node<Key, B, BlockSize>::update_block(const size_t old_block, const size_t 
 }
 
 template <typename Key, size_t B, size_t BlockSize>
-bool Node<Key, B, BlockSize>::find( const Key& key, Pair_T* o_pair ) const
+bool Node<Key, B, BlockSize>::find( const Key& key, Link& o_link ) const
 {
     OTK_ASSERT( o_pair );
     OTK_ASSERT( is_leaf() );
@@ -820,7 +899,7 @@ bool Node<Key, B, BlockSize>::find( const Key& key, Pair_T* o_pair ) const
         it->first != key )
         return false;
 
-    *o_pair = *it;
+    o_link = it->second;
     return true;
 }
 
@@ -967,15 +1046,16 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::initSnapshots()
         {
             do
             {
-                size_t snapHead[ 5 ]; // id, new count, modified count, total count, root.
-                m_snapshotFile->read( &snapHead, 5 * sizeof( size_t ), curOffset );
-                curOffset += 5 * sizeof( size_t );
+                size_t snapHead[ 6 ]; // id, new count, modified count, total count, root, root local offset
+                m_snapshotFile->read( &snapHead, 6 * sizeof( size_t ), curOffset );
+                curOffset += 6 * sizeof( size_t );
 
                 const size_t id = snapHead[ 0 ];
                 const size_t nc = snapHead[ 1 ];
                 const size_t mc = snapHead[ 2 ];
                 const size_t tc = snapHead[ 3 ];
                 const size_t rt = snapHead[ 4 ];
+                const size_t lo = snapHead[ 5 ];
 
                 OTK_ASSERT( nc + mc == tc );
 
@@ -987,6 +1067,7 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::initSnapshots()
 
                 snapshot->set_id( id );
                 snapshot->set_root( rt );
+                snapshot->set_root_local_offset( lo );
                 std::copy( in_data.begin(), in_data.begin() + nc,
                            std::inserter( snapshot->m_new_blocks, snapshot->m_new_blocks.end() ) );
                 std::copy( in_data.begin() + nc, in_data.begin() + nc + mc,
@@ -1029,10 +1110,11 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
         const size_t mc = snap->m_modified_blocks.size();
         const size_t tc = nc + mc;
         const size_t rt = snap->m_root_index;
+        const size_t lo = snap->m_root_local_offset;
 
-        size_t snapHead[ 5 ] = { id, nc, mc, tc, rt };// id, new count, modified count, total count, root.
-        m_snapshotFile->write( &snapHead, 5 * sizeof( size_t ), curOffset );
-        curOffset += 5 * sizeof( size_t );
+        size_t snapHead[ 6 ] = { id, nc, mc, tc, rt, lo };// id, new count, modified count, total count, root, root local offset
+        m_snapshotFile->write( &snapHead, 6 * sizeof( size_t ), curOffset );
+        curOffset += 6 * sizeof( size_t );
 
         std::vector<size_t> blocks( snap->m_new_blocks.begin(), snap->m_new_blocks.end() );
         m_snapshotFile->write( blocks.data(), blocks.size() * sizeof( size_t ), curOffset );
@@ -1068,7 +1150,7 @@ std::shared_ptr< TableReader< Key, Record, B, BlockSize, BlockAlignment > > Tabl
     OTK_ASSERT( it != m_readers.end() );
 
     if( !it->second )
-        it->second.reset( new TableReaderType() );
+        it->second.reset( new TableReaderType( m_dataFile, it->first.m_root_index, it->first.m_root_local_offset ) );
 
     return it->second;
 }
@@ -1861,11 +1943,15 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterData
     {
         index = copy_on_write( index );
     }
-    else if( !m_blockMap.count( index ) )
-    {
-        m_blockMap.emplace( std::make_pair( index, std::make_shared< TableWriterDataBlock >( m_dataFile->checkOutForReadWrite( index ) ) ) );
-        m_blockMap[ index ]->init_existing();
-    }
+
+    OTK_ASSERT( m_currentSnapshot.is_new( index ) );
+    OTK_ASSERT( m_blockMap.count( index ) );
+
+    // Re-load from disk if we released it before.
+    if( !m_blockMap[index]->is_valid() )
+        m_blockMap[ index ]->set_data( m_dataFile->checkOutForReadWrite( index ) );
+
+    OTK_ASSERT( m_blockMap[ index ]->is_valid() );
 
     return m_blockMap.at( index );
 }
@@ -1887,18 +1973,23 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterData
     {
         TableWriterDataBlockPtr new_block = get_new_block();
         OTK_ASSERT( new_block->index() == m_currentSnapshot.m_root_index );
+        OTK_ASSERT( new_block->root_offset( 0 ) == m_currentSnapshot.m_root_local_offset );
         Node* root = new_block->node( new_block->root_offset( 0 ) );
         root->set_leaf( true );
     }
     else if( !m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) )
     {
         m_currentSnapshot.set_root( copy_on_write( m_currentSnapshot.m_root_index ) );
+        m_currentSnapshot.set_root_local_offset( m_blockMap[ m_currentSnapshot.m_root_index ]->root_offset( 0 ) );
     }
-    else if( !m_blockMap.count( m_currentSnapshot.m_root_index ) )
-    {
-        m_blockMap.emplace( m_currentSnapshot.m_root_index, std::make_shared< TableWriterDataBlock >( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_root_index ) ) );
-        m_blockMap[ m_currentSnapshot.m_root_index ]->init_existing();
-    }
+
+    OTK_ASSERT( m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) );
+
+    // Re-load from disk if we released it before.
+    if( !m_blockMap[ m_currentSnapshot.m_root_index ]->is_valid() )
+        m_blockMap[ m_currentSnapshot.m_root_index ]->set_data( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_root_index ) );
+
+    OTK_ASSERT( m_currentSnapshot.m_root_local_offset == m_blockMap[ m_currentSnapshot.m_root_index ]->root_offset( 0 ) );
 
     return m_blockMap.at( m_currentSnapshot.m_root_index );
 }
@@ -1913,7 +2004,7 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Link TableWrite
         m_root_link.set_local( false );
         m_root_link.set_leaf( false );
         m_root_link.set_block( m_currentSnapshot.m_root_index );
-        m_root_link.set_local_address( root_block->root_offset( 0 ) );
+        m_root_link.set_local_address( m_currentSnapshot.m_root_local_offset );
     }
 
     return m_root_link;
@@ -1928,10 +2019,69 @@ Snapshot&& TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TakeSnaphot()
 
     m_currentSnapshot.set_id( snapshot.m_snapshot_id + 1 );
     m_currentSnapshot.set_root( snapshot.m_root_index );
+    m_currentSnapshot.set_root_local_offset( snapshot.m_root_local_offset );
 
     m_root_link.invalidate();
 
+    for( auto block : m_blockMap )
+        m_dataFile->unloadBlock( block->index(), true );
+
+    m_blockMap.clear();
+
     return std::move( snapshot );
+}
+
+
+/* TableReader method definitions */
+
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+bool TableReader<Key, Record, B, BlockSize, BlockAlignment>::Query( const Key& key, Record& record )
+{    
+    Link current_link = m_root_link;
+
+    TableReaderDataBlock block = get_block( current_link.get_block() );
+
+    while (true)
+    {
+        Node* current_node = block.node( current_link.get_local_address() );
+
+        // Found a leaf, insert here.
+        if( current_node->is_leaf() )
+        {
+            Link link;
+            if( current_node->find( key, &link ) )
+            {
+                OTK_ASSERT( link.is_leaf() );
+                record = block.record( link.get_local_address() );
+                return true;
+            }
+
+            return false;
+        }
+
+        // Traverse through the current Node, potentially
+        // moving to a different block.
+        Link next_link = current_node->traverse( key );
+        if( next_link.get_block() != current_link.get_block() )
+        {
+            block = get_block( next_link.get_block() );
+        }
+
+        current_link = next_link;
+    }
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+typename TableReader<Key, Record, B, BlockSize, BlockAlignment>::TableReaderDataBlock TableReader<Key, Record, B, BlockSize, BlockAlignment>::get_block(size_t index)
+{
+    OTK_ASSERT( m_dataFile->exists( index ) );
+    if( !m_blockMap.count( index ) )
+    {
+        m_blockMap.emplace( std::make_pair( index, TableReaderDataBlock( m_dataFile->checkOutForRead( index ) ) ) );
+    }
+
+    return m_blockMap.at(index);
 }
 
 } // namespace sceneDB

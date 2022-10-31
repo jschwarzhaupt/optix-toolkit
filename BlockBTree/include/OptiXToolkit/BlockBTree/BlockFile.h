@@ -160,7 +160,9 @@ public:
     /// The block is not added to the free list.
     /// If the block was loaded for read/write access, then it is
     /// written to disk prior to unloading.
-    void unloadBlock( const size_t index );
+    /// If migrate_to_read_list is true, the block is moved to the
+    /// list of read-only checked-out blocks.
+    void unloadBlock( const size_t index, const bool migrate_to_read_list );
 
     /// Invalidate the specified block and remove it from the map of blocks checked out
     /// for reading (if it has been checked out). Add the block to the free list.

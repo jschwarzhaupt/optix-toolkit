@@ -165,7 +165,7 @@ TEST_F(TestBlockFile, TestUnload)
     auto block_2 = file.checkOutForReadWrite( 2 );
     EXPECT_TRUE( block_2->is_valid() );
 
-    file.unloadBlock( 2 );
+    file.unloadBlock( 2, false );
     EXPECT_FALSE( block_2->is_valid() );
 
     auto block_2_read = file.checkOutForRead( 2 );

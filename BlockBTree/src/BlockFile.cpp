@@ -333,13 +333,14 @@ void BlockFile::flush( bool flush_caches )
     }
 }
 
-void BlockFile::unloadBlock( const size_t index )
+void BlockFile::unloadBlock( const size_t index, const bool migrate_to_read_list )
 {
     OTK_ASSERT_MSG( m_valid, "Attempt to unload block from invalid BlockFile." );
 
     auto r_it = m_readBlocks.find( index );
     if( r_it != m_readBlocks.end() )
     {
+        OTK_ASSERT( !migrate_to_read_list );
         r_it->second->set_valid( false );
         m_readBlocks.erase( r_it );
         return;
@@ -351,6 +352,12 @@ void BlockFile::unloadBlock( const size_t index )
         OTK_ASSERT( isWriteable() );
         w_it->second->set_valid( false );
         writeBlock( w_it->second );
+
+        if( migrate_to_read_list )
+        {
+            m_readBlocks[ w_it->first ] = w_it->second;
+        }
+
         m_writeBlocks.erase( w_it );
     }
 }
