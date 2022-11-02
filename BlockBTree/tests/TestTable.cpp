@@ -31,10 +31,10 @@
 #include <gtest/gtest.h>
 
 using namespace sceneDB;
-constexpr size_t k_branchingFactor = 4;
-constexpr size_t k_blockSize = 4096;
+constexpr size_t k_branchingFactor = 8;
+constexpr size_t k_blockSize = 1024;
 constexpr size_t k_blockAlignment = 8;
-using RecordT = int;
+using RecordT = size_t;
 using KeyT = size_t;
 using TableT = Table</*Key=*/KeyT, /*Record=*/RecordT, /*B=*/k_branchingFactor, /*BlockSize=*/k_blockSize, /*BlockAlignment=*/k_blockAlignment>;
 
@@ -45,6 +45,12 @@ class TestTable : public testing::Test
 TEST_F(TestTable, TestCreate)
 {
     TableT table( "test_table", "TestTable" );
+
+    if( std::filesystem::exists( table.getDataFile() ) )
+        std::filesystem::remove( table.getDataFile() );
+    if( std::filesystem::exists( table.getSnapshotFile() ) )
+        std::filesystem::remove( table.getSnapshotFile() );
+
     table.init( /*request_write=*/true );
 
     EXPECT_TRUE( std::filesystem::exists( table.getDataFile() ) );
@@ -65,4 +71,36 @@ TEST_F(TestTable, TestInsert)
     writer->Insert( 1, 1 );
 
     table.destroy();
+}
+
+TEST_F(TestTable, TestSnapshot)
+{
+    TableT table( "test_table", "TestTable" );
+
+    if( std::filesystem::exists( table.getDataFile() ) )
+        std::filesystem::remove( table.getDataFile() );
+    if( std::filesystem::exists( table.getSnapshotFile() ) )
+        std::filesystem::remove( table.getSnapshotFile() );
+
+    table.init( /*request_write=*/true);
+    auto writer(table.getWriter());
+
+    for( size_t i = 0; i < 4096; ++i)
+        writer->Insert( 2*i, 3*i );
+
+    auto snap = writer->TakeSnaphot();
+    auto reader = table.getReader( snap );
+
+    RecordT record;
+
+    for( size_t i = 0; i < 8192; ++i)
+    {
+        if( i & 1 )
+            EXPECT_FALSE( reader->Query( i, record ) );
+        else
+        {
+            EXPECT_TRUE( reader->Query( i, record ) );
+            EXPECT_EQ( (i / 2) * 3, record );
+        }
+    }
 }
