@@ -751,7 +751,7 @@ private:
     // starting at that root.
     // For a block with N roots, create N-1 new blocks. Each block gets one
     // of the trees, and one remains in the current block.
-    void split_block( TableWriterDataBlockPtr block, Node* block_parent );
+    void split_block( TableWriterDataBlock* block, Node* block_parent );
 
     // Returns whether the split succeeded or not.
     // Split may not succeed if the block needs to be split,
@@ -762,7 +762,7 @@ private:
     // AND the parent has room, we can just add a new node instead of splitting.
     // This avoids a huge space waste in cases where Keys either increase or
     // decrease monotonically.
-    bool split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link, const Key& key );
+    bool split_node( TableWriterDataBlock* block, Node* parent, Node* block_parent, Link src_link, const Key& key );
 
     // Copies the block at offset block_index into a new block.
     // Returns the offset for the new block.
@@ -1659,7 +1659,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
                 block_parent_node = get_block( block_parent_link.get_block() )->node( block_parent_link.get_local_address() );
             }
 
-            split_block( block, block_parent_node );
+            split_block( block.get(), block_parent_node);
 
             // Splitting the block moved things around, so we must
             // re-start traversal from the last known-good Node, which
@@ -1698,7 +1698,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             // Splitting a Node can, potentially, fail. This can happen
             // if we had to split the block or perform Node compaction, which
             // may move Nodes around.
-            if( !split_node( block, parent_node, block_parent_node, current_link, key ) )
+            if( !split_node( block.get(), parent_node, block_parent_node, current_link, key))
             {
                 // Had to split the block internally, or shuffle things around.
                 // Need to restart from the block_parent (or root).
@@ -1777,7 +1777,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableWriterDataBlockPtr block, Node* block_parent )
+void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableWriterDataBlock* block, Node* block_parent )
 {
     bool skip_first = false;
     Node* _parent   = nullptr;
@@ -1828,7 +1828,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableW
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link, const Key& key )
+bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWriterDataBlock* block, Node* parent, Node* block_parent, Link src_link, const Key& key )
 {
     OTK_ASSERT( src_link.get_block() == block->index() );
     Node* src_node = block->node( src_link.get_local_address() );
@@ -1895,7 +1895,7 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
         bool need_node_compaction = false, need_record_compaction = false;
         if( !block->has_room_for_n_nodes( 1, need_node_compaction, need_record_compaction ) )
         {
-            split_block( block, block_parent );
+            split_block( block, block_parent);
             return false;
         }
             
