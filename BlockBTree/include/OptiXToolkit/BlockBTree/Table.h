@@ -757,7 +757,12 @@ private:
     // Split may not succeed if the block needs to be split,
     // in which case traversal needs to be restarted from the
     // block's parent (as nodes can move).
-    bool split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link );
+    // The next Key to be inserted is given as a hint:
+    // If it is larger than the node's high_key (or lower than it's low_key)
+    // AND the parent has room, we can just add a new node instead of splitting.
+    // This avoids a huge space waste in cases where Keys either increase or
+    // decrease monotonically.
+    bool split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link, const Key& key );
 
     // Copies the block at offset block_index into a new block.
     // Returns the offset for the new block.
@@ -1693,7 +1698,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             // Splitting a Node can, potentially, fail. This can happen
             // if we had to split the block or perform Node compaction, which
             // may move Nodes around.
-            if( !split_node( block, parent_node, block_parent_node, current_link ) )
+            if( !split_node( block, parent_node, block_parent_node, current_link, key ) )
             {
                 // Had to split the block internally, or shuffle things around.
                 // Need to restart from the block_parent (or root).
@@ -1736,7 +1741,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
         // Found a leaf, insert here.
         if( current_node->is_leaf() )
         {
-            // If we split the a node, block could have filled up, in which case
+            // If we split the node, block could have filled up, in which case
             // we go around the loop again to split it.
             if( block->is_full() )
                 continue;
@@ -1823,16 +1828,20 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableW
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link )
+bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWriterDataBlockPtr block, Node* parent, Node* block_parent, Link src_link, const Key& key )
 {
     OTK_ASSERT( src_link.get_block() == block->index() );
     Node* src_node = block->node( src_link.get_local_address() );
     OTK_ASSERT( src_node->is_full() );
 
+    const bool key_larger  = src_node->is_leaf() && (key > src_node->high_key());
+    const bool key_smaller = src_node->is_leaf() && (key < src_node->low_key() );
+
     if( !parent )
     {
         OTK_ASSERT( !block_parent );
         OTK_ASSERT( block->is_root( src_link.get_local_address() ) );
+
         // Root node case. Keep src_node as the root node.
         // Add two nodes, migrate half the data to each.
         bool need_node_compaction = false, need_record_compaction = false;
@@ -1864,6 +1873,11 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
         uint16_t count = src_node->child_count();
         uint16_t left_count = count >> 1;
 
+        if( key_larger )
+            left_count = count; // Keep everything in the left node.
+        if( key_smaller )
+            left_count = 0;     // Keep everything in the right node.
+
         for( uint16_t i = 0; i < left_count; ++i )
             left_node->insert( src_node->get_pair( i ) );
         for( uint16_t i = left_count; i < count; ++i )
@@ -1872,8 +1886,8 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
         src_node->clear();
         src_node->set_leaf( false );
 
-        src_node->insert( {  left_node->low_key(), Link( false, true, block->index(), left_offset ) } );
-        src_node->insert( { right_node->low_key(), Link( false, true, block->index(), right_offset ) } );
+        src_node->insert( { key_smaller ? key : left_node->low_key(),  Link( false, true, block->index(), left_offset  ) } );
+        src_node->insert( { key_larger  ? key : right_node->low_key(), Link( false, true, block->index(), right_offset ) } );
     }
     else
     {
@@ -1958,14 +1972,25 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
         Node* right_node      = block->node(right_offset);
 
         right_node->set_leaf( src_node->is_leaf() );
+        Key to_insert;
 
-        for( uint16_t i = left_count; i < count; ++i )
-            right_node->insert( src_node->get_pair( i ) );
+        if( key_larger || key_smaller )
+        {
+            // Don't move anything around.
+            to_insert = key;
+        }
+        else
+        {
+            for( uint16_t i = left_count; i < count; ++i )
+                right_node->insert( src_node->get_pair( i ) );
 
-        for( uint16_t i = count - 1; i >= left_count; --i )
-            src_node->erase( i );
+            for( uint16_t i = count - 1; i >= left_count; --i )
+                src_node->erase( i );
 
-        parent->insert( { right_node->low_key(), Link( false, parent != block_parent, block->index(), right_offset ) } );
+            to_insert = right_node->low_key();
+        }
+
+        parent->insert( { to_insert, Link( false, parent != block_parent, block->index(), right_offset ) } );
 
         if( block->is_root( src_link.get_local_address() ) )
             block->add_root( right_offset );
