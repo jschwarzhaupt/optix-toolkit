@@ -62,6 +62,8 @@ class TableWriter;
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TableReader;
 
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+class TablePrinter;
 
 // A Snapshot records information about which blocks
 // in a Table are modified and/or new when compared
@@ -310,6 +312,7 @@ class Table
 public:
     typedef TableWriter<Key, Record, B, BlockSize, BlockAlignment> TableWriterType;
     typedef TableReader<Key, Record, B, BlockSize, BlockAlignment> TableReaderType;
+    typedef TablePrinter<Key, Record, B, BlockSize, BlockAlignment> TablePrinterType;
     typedef struct Node<Key, B, BlockSize> Node;
 
     Table( const char* directory, const char* tableName )
@@ -336,6 +339,9 @@ public:
     /// which can be used concurrently by multiple threads. 
     /// Throws an exception if an error occurs.
     std::shared_ptr< TableReaderType > getReader( std::shared_ptr< const Snapshot > snapshot );
+
+    /// Get a TablePrinter that can be used to print the entire table at the specified snapshot.
+    std::shared_ptr< TablePrinterType > getPrinter( std::shared_ptr< const Snapshot > snapshot );
 
     /// Get the table name.
     const std::string& getTableName() const { return m_tableName; }
@@ -855,8 +861,8 @@ public:
 
     // No copying
     TableReader( const TableReader& o ) = delete;
-    
-private:
+
+  protected:
     // Fetch the block at the given offset.
     // If the block has already been loaded, this returns immediately.
     // Otherwise, the block is loaded from disk.
@@ -1180,6 +1186,13 @@ std::shared_ptr< TableReader< Key, Record, B, BlockSize, BlockAlignment > > Tabl
         it->second.reset( new TableReaderType( m_dataFile, it->first->m_root_index, it->first->m_root_local_offset ) );
 
     return it->second;
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+std::shared_ptr< TablePrinter< Key, Record, B, BlockSize, BlockAlignment > > Table< Key, Record, B, BlockSize, BlockAlignment >::getPrinter( std::shared_ptr< const Snapshot > snapshot )
+{
+    std::unique_lock<std::mutex> lock( m_mutex );
+    return std::make_shared<TablePrinterType>( m_dataFile, snapshot->m_root_index, snapshot->m_root_local_offset );
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
