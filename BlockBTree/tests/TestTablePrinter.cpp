@@ -56,7 +56,7 @@ TEST_F(TestTablePrinter, Test)
     table.init( /*request_write=*/true);
     auto writer(table.getWriter());
 
-    for( size_t i = 0; i < 4096; ++i)
+    for( size_t i = 0; i < 256; ++i)
         writer->Insert( 2*i, 3*i );
 
     auto snap = writer->TakeSnaphot();

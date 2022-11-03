@@ -30,9 +30,13 @@
 #include <OptiXToolkit/BlockBTree/Table.h>
 
 #include <iostream>
+#include <map>
 
 namespace sceneDB {
 
+/// Print table as a DOT graph.  Use Table::getPrinter() to obtain a TablePrinter.
+/// The dot executable is part of the Graphviz package: https://graphviz.org/download/
+/// Use "dot -Tpdf filename.dot" to render a DOT graph to PDF.
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 class TablePrinter : public TableReader<Key, Record, B, BlockSize, BlockAlignment>
 {
@@ -50,41 +54,93 @@ class TablePrinter : public TableReader<Key, Record, B, BlockSize, BlockAlignmen
     void Print( std::ostream& out );
 
   private:
-    void PrintNode( std::ostream& out, Link link );
+    void GatherBlocks( std::map<size_t, std::vector<size_t>>& blocks, Link link );
+    void PrintBlocks( std::map<size_t, std::vector<size_t>>& blocks, std::ostream& out );
+    void PrintEdges( std::ostream& out, Link link );
 };
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::Print( std::ostream& out )
 {
-    // Start DOT graph
+    // Start DOT graph.  See https://graphviz.org/doc/info/lang.html
     out << "digraph G {" << std::endl;
-    out << "  node [shape=record]" << std::endl;
+    out << "  layout=dot" << std::endl;
+    out << "  node [shape=record, style=filled, color=black, fillcolor=white]" << std::endl;
 
-    // Print an incoming edge to the root node, to ensure that it's rendered if it's empty.
-    Link link = TableReader::m_root_link;
-    out << "  root [shape=none,label=\"\"]" << std::endl;
-    out << "  root -> " << link.m_link << std::endl;
+    // Map from block to vector of node offsets.
+    std::map<size_t, std::vector<size_t>> blocks;
 
-    // Recursively print nodes.
-    PrintNode( out, link );
+    // Gather a vector of node offsets for each block.
+    GatherBlocks( blocks, TableReader::m_root_link );
+
+    // Print the nodes of each block as a subgraph.
+    PrintBlocks( blocks, out );
+
+    // Print the edges.
+    PrintEdges( out, TableReader::m_root_link );
 
     // End DOT graph.
     out << "}" << std::endl;
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintNode( std::ostream& out, Link link )
+void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::GatherBlocks( std::map<size_t, std::vector<size_t>>& blocks, Link link )
+{
+    // Add this node to the vector of nodes for the corresponding block.
+    blocks[link.get_block()].push_back( link.get_local_address() );
+
+    // Recursively gather child nodes.
+    TableReaderDataBlock block = TableReader::get_block( link.get_block() );
+    const Node*          node  = block.node( link.get_local_address() );
+    if( !node->is_leaf() )
+    {
+        for( unsigned int i = 0; i < node->m_valid_count; ++i )
+        {
+            Link child = node->m_pairs[i].second;
+            GatherBlocks( blocks, child );
+        }
+    }
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintBlocks( std::map<size_t, std::vector<size_t>>& blocks,
+                                                                           std::ostream& out )
+{
+    for( auto it = blocks.begin(); it != blocks.end(); ++it )
+    {
+        size_t               block_offset = it->first;
+        TableReaderDataBlock block        = TableReader::get_block( block_offset );
+
+        // Begin DOT subgraph.  See https://graphviz.org/Gallery/directed/cluster.html
+        out << "  subgraph cluster_" << block_offset << " {" << std::endl;
+        out << "    style=filled" << std::endl;
+        out << "    color=lightgrey" << std::endl;
+
+        for( size_t node_offset : it->second )
+        {
+            const Node* node = block.node( node_offset );
+
+            // Print record node labelled "<0>|...|<N-1>" where N is the number of children.
+            // See https://graphviz.org/doc/info/shapes.html#record
+            out << "    "
+                << "node_" << block_offset << "_" << node_offset << " [label=\"<0>";
+            for( unsigned int i = 1; i < node->m_valid_count; ++i )
+            {
+                out << "|<" << i << ">";
+            }
+            out << "\"]" << std::endl;
+        }
+
+        // End DOT subgraph
+        out << "  }" << std::endl;
+    }
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintEdges( std::ostream& out, Link link )
 {
     TableReaderDataBlock block = TableReader::get_block( link.get_block() );
     const Node*          node  = block.node( link.get_local_address() );
-    // Print record node labelled "<1>|...|<B-1>"
-    // (note that pair zero is reserved)
-    out << "  " << link.m_link << " [label=\"<1>";
-    for( unsigned int i = 2; i < node->m_valid_count; ++i )
-    {
-        out << "|<" << i << ">";
-    }
-    out << "\"]" << std::endl;
 
     if( node->is_leaf() )
     {
@@ -93,17 +149,20 @@ void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintNode( std::os
 
     // Print an edge for each child, of the form "P:i:s -> C:n", where
     // P=parent, i=index, s=south, C=child, n=north
-    for( unsigned int i = 1; i < node->m_valid_count; ++i )
+    for( unsigned int i = 0; i < node->m_valid_count; ++i )
     {
         Link child = node->m_pairs[i].second;
-        out << "  " << link.m_link << ":" << i << ":s -> " << child.m_link << ":n" << std::endl;
+
+        out << "  "
+            << "node_" << link.get_block() << "_" << link.get_local_address() << ":" << i << ":s -> "
+            << "node_" << child.get_block() << "_" << child.get_local_address() << ":n" << std::endl;
     }
 
-    // Recursively print the child nodes.
-    for( unsigned int i = 1; i < node->m_valid_count; ++i )
+    // Recursively print edges from child nodes.
+    for( unsigned int i = 0; i < node->m_valid_count; ++i )
     {
         Link child = node->m_pairs[i].second;
-        PrintNode( out, child );
+        PrintEdges( out, child );
     }
 }
 
