@@ -104,12 +104,12 @@ SimpleFile::~SimpleFile()
     close();
 }
 
+#ifdef WIN32
 namespace {
-
 void emptyCompletion(DWORD e, DWORD c, OVERLAPPED* o)
 {}
-
 }
+#endif
 
 void SimpleFile::read( void* buffer, size_t size, offset_t offset ) const
 {
@@ -201,7 +201,7 @@ void SimpleFile::close()
 #ifdef WIN32
         CloseHandle(m_file);
 #else
-        close(m_file);
+        ::close(m_file);
 #endif    
         m_valid = false;
     }

@@ -126,18 +126,18 @@ BlockFile::~BlockFile()
 #ifdef WIN32
         CloseHandle( m_file );
 #else
-        close( m_file );
+        ::close( m_file );
 #endif    
         m_valid = false;
     }
 }
 
+#ifdef WIN32
 namespace {
-
 void emptyCompletion(DWORD e, DWORD c, OVERLAPPED* o)
 {}
-
 }
+#endif
 
 std::shared_ptr<const DataBlock> BlockFile::checkOutForRead( const size_t index )
 {
@@ -635,7 +635,7 @@ void BlockFile::close()
 #ifdef WIN32
     CloseHandle(m_file);
 #else
-    close(m_file);
+    ::close(m_file);
 #endif    
     m_valid = false;
 
