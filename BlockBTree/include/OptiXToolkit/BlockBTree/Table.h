@@ -808,7 +808,7 @@ public:
     typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
     typedef typename TableType::Node Node;
         
-    TableReaderDataBlock( std::shared_ptr< const DataBlock >& data )
+    TableReaderDataBlock( const std::shared_ptr< const DataBlock >& data )
         : m_data( ( const char* )( data->get_data() ) )
     {
         OTK_ASSERT( data->size == BlockSize );

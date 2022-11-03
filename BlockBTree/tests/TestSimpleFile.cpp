@@ -37,7 +37,7 @@ class TestSimpleFile : public testing::Test
 {
 };
 
-constexpr char* k_filename = "test_simplefile.dat";
+constexpr const char* k_filename = "test_simplefile.dat";
 
 TEST_F(TestSimpleFile, TestCreateDestroyWriteable)
 {
