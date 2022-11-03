@@ -41,7 +41,7 @@ template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAl
 class TablePrinter : public TableReader<Key, Record, B, BlockSize, BlockAlignment>
 {
   public:
-    using TableReader = class TableReader<Key, Record, B, BlockSize, BlockAlignment>;
+    typedef class TableReader<Key, Record, B, BlockSize, BlockAlignment> TableReader;
     typedef Table<Key, Record, B, BlockSize, BlockAlignment> TableType;
     typedef typename TableType::Node       Node;
     typedef typename TableType::Node::Link Link;

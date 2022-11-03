@@ -843,7 +843,7 @@ public:
     typedef typename TableType::Node::Link   Link;
     typedef typename TableType::Node::Pair_T Pair_T;
 
-private:
+protected:
   typedef struct TableReaderDataBlock<Key, Record, B, BlockSize, BlockAlignment> TableReaderDataBlock;
 
 public:
@@ -862,7 +862,7 @@ public:
     // No copying
     TableReader( const TableReader& o ) = delete;
 
-  protected:
+protected:
     // Fetch the block at the given offset.
     // If the block has already been loaded, this returns immediately.
     // Otherwise, the block is loaded from disk.
