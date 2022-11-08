@@ -261,6 +261,7 @@ TEST_F(TestTableWriterDataBlock, TestCompactNodes)
     for( size_t i = 0; i < node_count; ++i )
     {
         BlockT::Link link( /*leaf=*/false, /*local-*/false, /*block_index=*/m_block->index(), /*local_address=*/offsets[i] );
+        size_t p = sizeof(link);
         if( i % 3 == 0 )
         {
             parent_node.insert( { KeyT(i), link } );
@@ -406,7 +407,7 @@ TEST_F(TestTableWriterDataBlock, TestMigrateSubtree)
     size_t total_free_bytes_before_0 = m_block->total_free_bytes();
     size_t total_free_bytes_before_1 = block_1->total_free_bytes();
 
-    uint32_t root_offset = m_block->migrate_subtree( offset_node_1, block_1 );
+    uint32_t root_offset = m_block->migrate_subtree( offset_node_1, block_1.get() );
 
     EXPECT_NE( 0, root_offset );
     EXPECT_EQ( total_free_bytes_before_0 + total_free_bytes_before_1, m_block->total_free_bytes() + block_1->total_free_bytes() );

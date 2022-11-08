@@ -106,8 +106,10 @@ struct Snapshot
     std::set<size_t> m_modified_blocks;
 };
 
-inline bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snapshot_id < r.m_snapshot_id; }
+inline bool operator< (const Snapshot& l, const Snapshot& r) { return l.m_snapshot_id < r.m_snapshot_id; }
 
+inline bool operator< ( const size_t& l, const std::shared_ptr<const Snapshot>&  r ) { return l < r->m_snapshot_id; }
+inline bool operator< ( const std::shared_ptr<const Snapshot>& l, const size_t&  r ) { return l->m_snapshot_id < r; }
 
 // A Link encodes information about where to find data and
 // the kind of data pointed to.
@@ -118,19 +120,14 @@ inline bool operator< ( const Snapshot& l, const Snapshot& r ) { return l.m_snap
 template <size_t BlockSize>
 struct Link
 {
-    static constexpr size_t leaf_bit = size_t(1) << (sizeof(size_t) * 8 - 1);
-    static constexpr size_t local_bit = leaf_bit >> 1;
-    static constexpr size_t data_mask = ~(leaf_bit | local_bit);
-    static constexpr size_t local_mask = make_mask(BlockSize);
-    static constexpr size_t block_mask = data_mask & ~local_mask;
-    static constexpr size_t block_shift = get_msb(BlockSize);
-    static constexpr size_t block_limit = (block_mask >> block_shift) + 1;
+    static constexpr size_t block_bits = get_msb(BlockSize);
+    static constexpr size_t local_bits = (8 * sizeof(size_t)) - 2 - block_bits;
 
     // The two MSBs of Link values are reserved.
     // The highest bit differentiates leaf from interior nodes.
     // The next bit differentiates links within a Block (local) from
     // links to other Blocks.
-    Link() = default;
+    Link() : m_link(~0ull) {}
     Link( bool leaf, bool local, size_t block, size_t local_address )
     {
         OTK_ASSERT( !leaf || local ); // Leaf links must be local
@@ -150,38 +147,31 @@ struct Link
     bool is_valid() const { return m_link != ~0ull; }
     void invalidate() { m_link = ~0ull; }
 
-    bool is_leaf() const { return m_link & leaf_bit; }
+    bool is_leaf() const { return m_leaf_bit; }
     void set_leaf( bool l )
     {
-        if( l )
-            m_link |= leaf_bit;
-        else
-            m_link &= ~leaf_bit;
+        m_leaf_bit = l ? true : false;
     }
 
-    bool is_local() const { return m_link & local_bit; }
+    bool is_local() const { return m_local_bit; }
     void set_local( bool l )
     {
-        if( l )
-            m_link |= local_bit;
-        else
-            m_link &= ~local_bit;
+        m_local_bit = l ? true : false;
     }
 
     // Returns the offset within the block at which the data resides.
-    size_t get_local_address() const { return m_link & local_mask; }
+    size_t get_local_address() const { return m_local_address; }
     void set_local_address( size_t v )
     {
         OTK_ASSERT( v < BlockSize );
-        m_link = ( m_link & ~local_mask ) | ( v & local_mask );
+        m_local_address = v;
     }
 
     // Returns the index of the block at which the data resides.
-    size_t get_block() const { return ( m_link & block_mask ) >> block_shift; }
+    size_t get_block() const { return m_block_index; }
     void set_block( size_t b )
     {
-        OTK_ASSERT( b < block_limit );
-        m_link = ( m_link & ~block_mask ) | ( b << block_shift );
+        m_block_index = b;
     }
 
     bool operator==( const Link& o ) const
@@ -189,7 +179,17 @@ struct Link
         return m_link == o.m_link;
     }
 
-    size_t m_link{ ~0ull };
+    union
+    {
+        size_t m_link;
+        struct
+        {
+            size_t m_leaf_bit       : 1;
+            size_t m_local_bit      : 1;
+            size_t m_block_index    : block_bits;
+            size_t m_local_address  : local_bits;
+        };
+    };
 };
 
 
@@ -325,7 +325,10 @@ public:
     }
 
     /// Close a Table.  The contents of the table persist until it is destroyed via the destroy() method.
-    ~Table() = default;
+    ~Table()
+    {
+        close();
+    }
 
     /// Get a TableWriter that can be used to insert records in the store.
     /// The Table must have been initialized with write access.
@@ -363,6 +366,13 @@ public:
     void destroy();
 
     void addSnapshot( std::shared_ptr< const Snapshot > snapshot );
+
+    std::shared_ptr< const Snapshot > getLatestSnapshot() const
+    {
+        return m_latestSnapshot;
+    }
+
+    bool findSnapshot( const size_t& snapshot_id, std::shared_ptr< const Snapshot >& o_snapshot ) const;
 
     const std::filesystem::path& getDataFile() const { return m_dataFileName; }
     const std::filesystem::path& getSnapshotFile() const { return m_snapshotFileName; }
@@ -422,6 +432,8 @@ private:
     void initSnapshots();
     void writeSnapshots() const;
 
+    bool                        m_valid{ false };
+
     const std::string           m_tableName;
     const std::filesystem::path m_directory;
     const std::filesystem::path m_dataFileName;
@@ -435,7 +447,7 @@ private:
 
     std::mutex m_mutex;
     std::shared_ptr< TableWriterType > m_writer;
-    std::map< std::shared_ptr< const Snapshot >, std::shared_ptr< TableReaderType > > m_readers;
+    std::map< std::shared_ptr< const Snapshot >, std::shared_ptr< TableReaderType >, std::less<> > m_readers;
 };
 
 
@@ -661,7 +673,7 @@ public:
     // Move the portion of the subtree, with root Node at src_root_offset, that is stored
     // within this block, to dst_block.
     // Returns the offset within dst_block that holds the new root Node.
-    uint32_t migrate_subtree( uint32_t src_root_offset, std::shared_ptr<TableWriterDataBlock> dst_block );
+    uint32_t migrate_subtree( uint32_t src_root_offset, TableWriterDataBlock* dst_block );
 
     // Set the snapshot ID for this block.
     void set_snapshot( const Snapshot& snapshot ) { snapshot_id() = snapshot.m_snapshot_id; }
@@ -1046,6 +1058,8 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::init( bool request_writ
     }
     else
         OTK_ASSERT( m_snapshotFile );
+
+    m_valid = true;
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -1136,7 +1150,7 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
 
     for( auto pair : m_readers )
     {
-        std::shared_ptr<Snapshot> snap = pair.first;
+        std::shared_ptr<const Snapshot> snap = pair.first;
 
         const size_t id = snap->m_snapshot_id;
         const size_t nc = snap->m_new_blocks.size();
@@ -1162,6 +1176,7 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::writeSnapshots() const
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 std::shared_ptr< TableWriter< Key, Record, B, BlockSize, BlockAlignment > > Table< Key, Record, B, BlockSize, BlockAlignment >::getWriter()
 {
+    OTK_ASSERT( m_valid );
     std::unique_lock<std::mutex> lock( m_mutex );
 
     // Subsequent calls return the same writer.
@@ -1177,6 +1192,7 @@ std::shared_ptr< TableWriter< Key, Record, B, BlockSize, BlockAlignment > > Tabl
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 std::shared_ptr< TableReader< Key, Record, B, BlockSize, BlockAlignment > > Table< Key, Record, B, BlockSize, BlockAlignment >::getReader( std::shared_ptr< const Snapshot > snapshot )
 {
+    OTK_ASSERT( m_valid );
     std::unique_lock<std::mutex> lock( m_mutex );
 
     auto it = m_readers.find( snapshot );
@@ -1198,11 +1214,20 @@ std::shared_ptr< TablePrinter< Key, Record, B, BlockSize, BlockAlignment > > Tab
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void Table< Key, Record, B, BlockSize, BlockAlignment >::close()
 {
-    std::unique_lock<std::mutex> lock( m_mutex );
-    m_writer.reset();
-    m_readers.clear();
-    m_dataFile->close();
-    m_snapshotFile->close();
+    if( m_valid )
+    {
+        std::unique_lock<std::mutex> lock( m_mutex );
+        if( m_dataFile &&
+            m_dataFile->isWriteable() )
+            writeSnapshots();
+
+        m_writer.reset();
+        m_readers.clear();
+        m_dataFile->close();
+        m_snapshotFile->close();
+
+        m_valid = false;
+    }
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -1211,6 +1236,8 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::destroy()
     close();
     m_dataFile->destroy();
     m_snapshotFile->destroy();
+
+    OTK_ASSERT( !m_valid );
 }
 
 
@@ -1219,6 +1246,20 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::addSnapshot(std::shared
 {
     m_readers.insert( {snapshot, nullptr} );
 }
+
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+bool Table< Key, Record, B, BlockSize, BlockAlignment >::findSnapshot( const size_t& snapshot_id, std::shared_ptr< const Snapshot >& o_snapshot ) const
+{
+    const auto& it = m_readers.find( snapshot_id );
+    if( it != m_readers.cend() )
+    {
+        o_snapshot = it->first;
+        return true;
+    }
+    return false;
+}
+
 
 /* TableWriterDataBlock method definitions */
 
@@ -1479,7 +1520,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_roo
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::migrate_subtree( uint32_t src_root_offset, std::shared_ptr< TableWriterDataBlock > dst_block )
+uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::migrate_subtree( uint32_t src_root_offset, TableWriterDataBlock* dst_block )
 {
     uint32_t dst_root_offset = -1;
             
@@ -1598,8 +1639,8 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init_exist
                 else if( link.is_local() )
                     s.push( link.get_local_address() );
 
-                // Sanity check
-                OTK_ASSERT( !link.is_local() || link.get_block() == index() );
+                if( link.is_local() )
+                    link.set_block( index() );
             }
         } while( !s.empty() );
     }
@@ -1829,7 +1870,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableW
             OTK_ASSERT( block->is_root( child_link.get_local_address() ) );
 
         TableWriterDataBlockPtr new_block = get_new_block();
-        size_t offset = block->migrate_subtree( child_link.get_local_address(), new_block );
+        size_t offset = block->migrate_subtree( child_link.get_local_address(), new_block.get() );
 
         if( migrating_roots )
             OTK_ASSERT( !block->is_root( child_link.get_local_address() ) );
@@ -1970,7 +2011,7 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
 
                 OTK_ASSERT( src_block->is_root( link.get_local_address() ) );
 
-                size_t offset = src_block->migrate_subtree( link.get_local_address(), new_block );
+                size_t offset = src_block->migrate_subtree( link.get_local_address(), new_block.get() );
 
                 OTK_ASSERT( !src_block->is_root( link.get_local_address() ) );
 

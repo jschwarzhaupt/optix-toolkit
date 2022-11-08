@@ -32,9 +32,35 @@
 
 using namespace sceneDB;
 constexpr size_t k_branchingFactor = 8;
-constexpr size_t k_blockSize = 1024;
+constexpr size_t k_blockSize = 4096;
 constexpr size_t k_blockAlignment = 8;
-using RecordT = size_t;
+
+template <size_t bytes>
+struct Record
+{
+    Record() = default;
+
+    Record( const void* data )
+    {
+        memcpy( m_data, data, bytes );
+    }
+
+    Record& operator=( const Record& o )
+    {
+        memcpy( m_data, o.m_data, bytes );
+        return *this;
+    }
+
+    char m_data[ bytes ];
+};
+
+template <size_t bytes>
+bool operator==( const Record<bytes>& a, const Record<bytes>& b)
+{
+    return memcmp( a.m_data, b.m_data, bytes ) == 0;
+}
+
+using RecordT = Record<32>;
 using KeyT = size_t;
 using TableT = Table</*Key=*/KeyT, /*Record=*/RecordT, /*B=*/k_branchingFactor, /*BlockSize=*/k_blockSize, /*BlockAlignment=*/k_blockAlignment>;
 
@@ -68,7 +94,7 @@ TEST_F(TestTable, TestInsert)
     table.init( /*request_write=*/true );
     auto writer( table.getWriter() );
 
-    writer->Insert( 1, 1 );
+    writer->Insert( 1, RecordT( std::string( std::to_string( 1 ) + " this is a long string. 32 bytes." ).c_str() ) );
 
     table.destroy();
 }
@@ -86,7 +112,7 @@ TEST_F(TestTable, TestSnapshot)
     auto writer(table.getWriter());
 
     for( size_t i = 0; i < 4096; ++i)
-        writer->Insert( 2*i, 3*i );
+        writer->Insert( 2*i, RecordT( std::string( std::to_string( 3 * i ) + " this is a long string. 32 bytes." ).c_str() ) );
 
     auto snap = writer->TakeSnaphot();
     auto reader = table.getReader( snap );
@@ -100,7 +126,87 @@ TEST_F(TestTable, TestSnapshot)
         else
         {
             EXPECT_TRUE( reader->Query( i, record ) );
-            EXPECT_EQ( (i / 2) * 3, record );
+            EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );
         }
     }
+}
+
+TEST_F(TestTable, TestReopenSnapshot)
+{
+    TableT table( "test_table", "TestTable" );
+
+    table.init( /*request_write=*/false );
+    std::shared_ptr< const Snapshot > snapshot;
+
+    EXPECT_TRUE( table.findSnapshot( 0, snapshot ) );
+    EXPECT_EQ( 0, snapshot->m_snapshot_id );
+    EXPECT_FALSE( table.findSnapshot( 1, snapshot ) );
+
+    snapshot = table.getLatestSnapshot();
+
+    EXPECT_EQ( 0, snapshot->m_snapshot_id );
+}
+
+TEST_F(TestTable, TestReopenSnapshotAndRead)
+{
+    TableT table("test_table", "TestTable");
+
+    table.init( /*request_write=*/false);
+    std::shared_ptr< const Snapshot > snapshot;
+
+    snapshot = table.getLatestSnapshot();
+    EXPECT_EQ(0, snapshot->m_snapshot_id);
+
+    auto reader = table.getReader( snapshot );
+
+    RecordT record;
+
+    for( size_t i = 0; i < 8192; ++i)
+    {
+        if( i & 1 )
+            EXPECT_FALSE( reader->Query( i, record ) );
+        else
+        {
+            EXPECT_TRUE( reader->Query( i, record ) );
+            EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );
+        }
+    }
+}
+
+TEST_F(TestTable, TestReopenSnapshotAndWrite)
+{
+    TableT table("test_table", "TestTable");
+
+    table.init( /*request_write=*/true);
+    auto writer( table.getWriter() );
+    auto reader_old = table.getReader( table.getLatestSnapshot() );
+
+    for( size_t i = 4096; i < 8192; ++i)
+        writer->Insert( 2*i, RecordT( std::string( std::to_string( 3 * i ) + " this is a long string. 32 bytes." ).c_str() ) );
+
+    auto snap = writer->TakeSnaphot();
+    EXPECT_EQ( 1, snap->m_snapshot_id );
+    auto reader_new = table.getReader( snap );
+
+    RecordT record;
+
+    for( size_t i = 0; i < 16384; ++i)
+    {
+        if( i & 1 )
+            EXPECT_FALSE( reader_new->Query( i, record ) );
+        else
+        {
+            EXPECT_TRUE( reader_new->Query( i, record ) );
+            EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );
+            if( i < 8192 )
+            {
+                EXPECT_TRUE( reader_old->Query( i, record ) );
+                EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );
+            }
+            else
+                EXPECT_FALSE( reader_old->Query( i, record ) );
+        }
+    }
+
+    table.destroy();
 }
