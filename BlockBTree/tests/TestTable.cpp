@@ -27,8 +27,14 @@
 //
 
 #include <OptiXToolkit/BlockBTree/Table.h>
+#include <OptiXToolkit/BlockBTree/TablePrinter.h>
 
 #include <gtest/gtest.h>
+
+#include <fstream>
+#include <algorithm>
+#include <random>
+#include <numeric>
 
 using namespace sceneDB;
 constexpr size_t k_branchingFactor = 8;
@@ -111,15 +117,23 @@ TEST_F(TestTable, TestSnapshot)
     table.init( /*request_write=*/true);
     auto writer(table.getWriter());
 
-    for( size_t i = 0; i < 4096; ++i)
-        writer->Insert( 2*i, RecordT( std::string( std::to_string( 3 * i ) + " this is a long string. 32 bytes." ).c_str() ) );
+    std::vector<size_t> vec(1024*4);
+    std::iota( vec.begin(), vec.end(), 0);
 
+    auto rng = std::default_random_engine{};
+    std::shuffle( vec.begin(), vec.end(), rng);
+
+    for( size_t i = 0; i < 1024*4; ++i)
+    {
+        size_t j = vec[i];
+        writer->Insert( 2*j, RecordT( std::string( std::to_string( 3 * j ) + " this is a long string. 32 bytes." ).c_str() ) );
+    }
     auto snap = writer->TakeSnaphot();
     auto reader = table.getReader( snap );
 
     RecordT record;
 
-    for( size_t i = 0; i < 8192; ++i)
+    for (size_t i = 0; i < 1024*8; ++i)
     {
         if( i & 1 )
             EXPECT_FALSE( reader->Query( i, record ) );
@@ -161,7 +175,7 @@ TEST_F(TestTable, TestReopenSnapshotAndRead)
 
     RecordT record;
 
-    for( size_t i = 0; i < 8192; ++i)
+    for( size_t i = 0; i < 1024*8; ++i)
     {
         if( i & 1 )
             EXPECT_FALSE( reader->Query( i, record ) );
@@ -181,7 +195,7 @@ TEST_F(TestTable, TestReopenSnapshotAndWrite)
     auto writer( table.getWriter() );
     auto reader_old = table.getReader( table.getLatestSnapshot() );
 
-    for( size_t i = 4096; i < 8192; ++i)
+    for( size_t i = 1024*4; i < 1024*8; ++i)
         writer->Insert( 2*i, RecordT( std::string( std::to_string( 3 * i ) + " this is a long string. 32 bytes." ).c_str() ) );
 
     auto snap = writer->TakeSnaphot();
@@ -190,7 +204,7 @@ TEST_F(TestTable, TestReopenSnapshotAndWrite)
 
     RecordT record;
 
-    for( size_t i = 0; i < 16384; ++i)
+    for( size_t i = 0; i < 1024*16; ++i)
     {
         if( i & 1 )
             EXPECT_FALSE( reader_new->Query( i, record ) );
@@ -198,7 +212,7 @@ TEST_F(TestTable, TestReopenSnapshotAndWrite)
         {
             EXPECT_TRUE( reader_new->Query( i, record ) );
             EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );
-            if( i < 8192 )
+            if( i < 1024*8 )
             {
                 EXPECT_TRUE( reader_old->Query( i, record ) );
                 EXPECT_EQ( RecordT( std::string( std::to_string( (i / 2) * 3 ) + " this is a long string. 32 bytes." ).c_str() ), record );

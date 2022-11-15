@@ -513,6 +513,7 @@ public:
 
     TableWriterDataBlock( std::shared_ptr< DataBlock > data )
         : m_dataBlock( data )
+        , m_rootData( reinterpret_cast< RootData* >( ptr() + root_data_offset() ) )
         , m_index( data->index )
     {
         OTK_ASSERT( m_dataBlock->size == BlockSize );
@@ -544,6 +545,7 @@ public:
         OTK_ASSERT( data->size == BlockSize );
         OTK_ASSERT( data->index == m_index );
         m_dataBlock = data;
+        m_rootData  = reinterpret_cast< RootData* >( ptr() + root_data_offset() );
     }
 
     // Reclaim any space that has been left by erasing Nodes.
@@ -575,53 +577,54 @@ public:
     // Returns whether the block has enough space to store n values of size bytes each.
     // 'need_node_compaction' flags if compacting Nodes is necessary to have enough space.
     // 'need_record_compaction' flags if compacting Records is necessary to have enough space.
-    template< size_t size >
-    bool has_room_for_n( uint32_t n, bool& need_node_compaction, bool& need_record_compaction ) const
+    template< bool is_nodes >
+    bool has_room_for_n( uint32_t n, bool& need_compaction ) const
     {
-        need_node_compaction   = false;
-        need_record_compaction = false;
+        need_compaction   = false;
+        const size_t size = is_nodes ? sizeof(Node) : sizeof(Record);
 
         auto nc_fb = no_compact_free_bytes();
 
         if( nc_fb >= n * size )
             return true;
 
-        auto cr_fb = compact_records_free_bytes();
-        if( nc_fb + cr_fb >= n * size )
-        {
-            need_record_compaction = true;
-            return true;
-        }
-
         auto cn_fb = compact_nodes_free_bytes();
-        if( nc_fb + cn_fb >= n * size )
-        {
-            need_node_compaction = true;
-            return true;
-        }
+        auto cr_fb = compact_records_free_bytes();
 
-        if( total_free_bytes() >= n * size )
+        if( is_nodes )
         {
-            need_node_compaction   = true;
-            need_record_compaction = true;
-            return true;
+            if( nc_fb + cn_fb >= n * size )
+                return true;
+            if( nc_fb + cn_fb + cr_fb >= n * size )
+            {
+                need_compaction = true;
+                return true;
+            }
+        }
+        else
+        {
+            if( nc_fb + cr_fb >= n * size )
+                return true;
+            if( nc_fb + cn_fb + cr_fb >= n * size )
+            {
+                need_compaction = true;
+                return true;
+            }
         }
 
         return false;
     }
 
     bool has_room_for_n_nodes( uint32_t n, 
-                               bool&    need_node_compaction, 
                                bool&    need_record_compaction ) const
     {
-        return has_room_for_n< sizeof(Node) >( n, need_node_compaction, need_record_compaction );
+        return has_room_for_n< true >( n, need_record_compaction );
     }
 
     bool has_room_for_n_records( uint32_t   n, 
-                                 bool&      need_node_compaction, 
-                                 bool&      need_record_compaction ) const
+                                 bool&      need_node_compaction ) const
     {
-        return has_room_for_n< sizeof(Record) >( n, need_node_compaction, need_record_compaction );
+        return has_room_for_n< false >( n, need_node_compaction );
     }
 
     size_t usable_size() const { return root_data_offset(); }
@@ -662,13 +665,13 @@ public:
     void remove_root( const uint32_t offset );
 
     // Return the number of root Nodes in this block.
-    uint32_t root_count() const { return root_data_ptr()->m_root_count; }
+    uint32_t root_count() const { return m_rootData->m_root_count; }
 
     // Return the offset to the n'th root Node.
-    size_t root_offset( uint32_t n ) const { OTK_ASSERT( n < root_count() ); return root_data_ptr()->m_root_offsets[ n ]; }
+    size_t root_offset( uint32_t n ) const { OTK_ASSERT( n < root_count() ); return m_rootData->m_root_offsets[ n ]; }
 
     // Check if the Node at offset is a root.
-    bool is_root( uint32_t offset ) const { return root_data_ptr()->is_root( offset ); }
+    bool is_root( uint32_t offset ) const { return m_rootData->is_root( offset ); }
 
     // Move the portion of the subtree, with root Node at src_root_offset, that is stored
     // within this block, to dst_block.
@@ -680,6 +683,8 @@ public:
 
     size_t index() const { return m_index; }
 
+    const Metadata get_metadata() const { return m_metaData; }
+
 private:
     static constexpr uint32_t snap_id_offset()   { return BlockSize - sizeof( std::size_t ); }
     static constexpr uint32_t root_data_offset() { return snap_id_offset() - sizeof( RootData ); }
@@ -689,9 +694,6 @@ private:
     const char* ptr() const { return ( const char* )( m_dataBlock->get_data() ); }
 
     std::size_t* snap_id_ptr() { return ( size_t* )( ptr() + snap_id_offset() ); }
-
-    RootData*       root_data_ptr()       { return reinterpret_cast< RootData* >( ptr() + root_data_offset() ); }
-    const RootData* root_data_ptr() const { return reinterpret_cast< const RootData* >( ptr() + root_data_offset() ); }
 
     Node*       node_ptr( const size_t offset )       { return reinterpret_cast< Node* >( ptr() + offset ); }
     const Node* node_ptr( const size_t offset ) const { return reinterpret_cast< const Node* >( ptr() + offset ); }
@@ -706,6 +708,7 @@ private:
 
     std::shared_ptr< DataBlock > m_dataBlock;
     Metadata                     m_metaData;
+    RootData*                    m_rootData;
     size_t                       m_index;
     bool                         m_valid{ false };
 };
@@ -968,7 +971,7 @@ bool Node<Key, B, BlockSize>::insert( const Pair_T& pair )
     bool exists = ( it != end &&
                     it->first == pair.first );
 
-    OTK_ASSERT( !is_full() || exists );
+    OTK_ASSERT( !is_full() || ( exists && !m_metadata.is_leaf() ) );
 
     if( exists )
         it->second = pair.second;
@@ -1267,7 +1270,7 @@ bool Table< Key, Record, B, BlockSize, BlockAlignment >::findSnapshot( const siz
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_nodes( Node* parent )
 {
-    RootData& rd = *root_data_ptr();
+    RootData& rd = *m_rootData;
     std::map< int, int > remap;
 
     while( !m_metaData.m_free_nodes.empty() )
@@ -1315,16 +1318,24 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_no
     // Now iterate through all valid Nodes, updating links as we go.
     for( int offset = 0; offset < m_metaData.m_next_node && !remap.empty(); offset += sizeof( Node ) )
     {
-        for( auto it = remap.begin(); it != remap.end(); ++it )
+        // Skip leaf Nodes.
+        if( node( offset )->is_leaf() )
+            continue;
+
+        for( auto it = remap.begin(); it != remap.end(); )
         {
-            Link link_old( true, true, index(), it->first );
+            Link link_old( false, true, index(), it->first );
 
             if( node( offset )->has_link( link_old ) )
             {
-                Link link_new( true, true, index(), it->second );   
+                Link link_new( false, true, index(), it->second );   
                 node( offset )->update_link( link_old, link_new );
                 it = remap.erase( it );
+                if( it == remap.end() )
+                    break;
             }
+            else
+                ++it;
         }
     }
 }
@@ -1376,6 +1387,8 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
                 Link link_new( true, true, index(), it->second );   
                 node( offset )->update_link( link_old, link_new );
                 it = remap.erase( it );
+                if( it == remap.end() )
+                    break;
             }
             else
                 ++it;
@@ -1494,7 +1507,7 @@ template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAl
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_root( const uint32_t offset )
 {
     OTK_ASSERT( validate_node_offset( offset ) );
-    auto rd = root_data_ptr();
+    auto rd = m_rootData;
     OTK_ASSERT( rd->m_root_count < B );
     rd->m_root_offsets[ rd->m_root_count++ ] = offset;
 }
@@ -1502,7 +1515,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_root( 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_root( const uint32_t offset )
 {
-    auto rd = root_data_ptr();
+    auto rd = m_rootData;
     OTK_ASSERT( validate_node_offset( offset ) );
     
     uint32_t index = ~0u;
@@ -1598,7 +1611,7 @@ template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAl
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init( const Snapshot& snapshot )
 {
     set_snapshot( snapshot );
-    new ( root_data_ptr() ) RootData();
+    new ( m_rootData ) RootData();
     m_metaData.m_next_record = record_offset();
 
     auto offset = add_node();
@@ -1610,7 +1623,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init( cons
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init_existing()
 {
-    const auto& root_data = *root_data_ptr();
+    const auto& root_data = *m_rootData;
             
     // Keep track of valid Nodes and Records.
     std::set< uint32_t > nodes;
@@ -1713,7 +1726,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
                 block_parent_node = get_block( block_parent_link.get_block() )->node( block_parent_link.get_local_address() );
             }
 
-            split_block( block.get(), block_parent_node);
+            split_block( block.get(), block_parent_node );
 
             // Splitting the block moved things around, so we must
             // re-start traversal from the last known-good Node, which
@@ -1721,7 +1734,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             // If there's no block_parent, we just re-start from the root.
             parent_link = block_parent_link;
             if( block_parent_node )
-                current_link = block_parent_node->traverse( key );
+                current_link = block_parent_node->traverse( key, true );
             else
                 current_link = root_link;
 
@@ -1733,6 +1746,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
         }
 
         Node* current_node = block->node( current_link.get_local_address() );
+
         // Now check whether the current Node is full.
         // If so, we must also split it before proceeding.
         if( current_node->is_full() )
@@ -1758,7 +1772,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
                 // Need to restart from the block_parent (or root).
                 parent_link = block_parent_link;
                 if( block_parent_node )
-                    current_link = block_parent_node->traverse( key );
+                    current_link = block_parent_node->traverse( key, true );
                 else
                     current_link = root_link;
 
@@ -1774,7 +1788,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             // parent Node.
             if( parent_node )
             {
-                current_link = parent_node->traverse( key );
+                current_link = parent_node->traverse( key, true );
                 block = get_block( current_link.get_block() );
 
                 // We shouldn't have any copy-on-write happening here.
@@ -1800,17 +1814,50 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             if( block->is_full() )
                 continue;
 
-            uint32_t offset = block->add_record( record );
-            OTK_ASSERT( offset != uint32_t( -1 ) );
+            // Check whether we need to compact nodes or not.
+            bool need_nodes_compaction = false;
+            if( !block->has_room_for_n_records( 1, need_nodes_compaction ) )
+            {
+                // This shouldn't happen, the block must be full.
+                OTK_ASSERT( block->is_full() );
+            }
 
-            bool result = current_node->insert( std::make_pair( key, Link( true, true, block->index(), offset ) ) );
-            OTK_ASSERT( result );
-            return;
+            if( need_nodes_compaction )
+            {
+                Node* block_parent_node = nullptr;
+                if( block_parent_link.is_valid() )
+                {
+                    block_parent_node = get_block( block_parent_link.get_block() )->node( block_parent_link.get_local_address() );
+                }
+
+                block->compact_nodes( block_parent_node );
+
+                if( block_parent_node )
+                {
+                    current_link = block_parent_link;
+                    current_node = block_parent_node;
+                }
+                else
+                {
+                    current_link = root_link;
+                    block_parent_link = parent_link = Link();
+                    current_node = get_block( root_link.get_block() )->node( root_link.get_local_address() );
+                }
+            }
+            else
+            {
+                uint32_t offset = block->add_record( record );
+                OTK_ASSERT( offset != uint32_t( -1 ) );
+
+                bool result = current_node->insert( std::make_pair( key, Link( true, true, block->index(), offset ) ) );
+                OTK_ASSERT( result );
+                return;
+            }
         }
 
         // Traverse through the current Node, potentially
         // moving to a different block.
-        Link next_link = current_node->traverse( key );
+        Link next_link = current_node->traverse( key, true );
         if( next_link.get_block() != block->index() )
         {
             block = get_block( next_link.get_block() );
@@ -1878,6 +1925,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_block( TableW
         child_link.set_local( false );
         child_link.set_block( new_block->index() );
         child_link.set_local_address( offset );
+        OTK_ASSERT( new_block->node( offset ) != nullptr );
     }
 }
 
@@ -1891,6 +1939,65 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
     const bool key_larger  = src_node->is_leaf() && (key > src_node->high_key());
     const bool key_smaller = src_node->is_leaf() && (key < src_node->low_key() );
 
+    uint16_t count = src_node->child_count();
+    uint16_t left_count = count >> 1;
+
+    // Check to see if splitting the node would result in two
+    // nodes pointing to the same block, which can't happen.
+    // If so, migrate some subtrees to a new block.
+    if( !src_node->get_pair( left_count - 1 ).second.is_local() &&
+        src_node->get_pair( left_count - 1 ).second.get_block() == src_node->get_pair( left_count ).second.get_block() )
+    {
+        size_t block_index = src_node->get_pair( left_count ).second.get_block();
+        OTK_ASSERT( block_index != block->index() );
+        uint16_t left_n = 0, right_n = 0;
+
+        for( uint16_t i = 0; i < count; ++i )
+            if( src_node->get_pair( i ).second.get_block() == block_index )
+            {
+                if (i < left_count)
+                    left_n++;
+                else
+                    right_n++;
+            }
+
+        TableWriterDataBlockPtr new_block = get_new_block();
+
+        uint16_t start = 0;
+        uint16_t end   = left_count;
+        if( left_n > right_n )
+        {
+            start = left_count;
+            end   = count;
+        }
+
+        TableWriterDataBlockPtr src_block = get_block( block_index );
+        // Check for copy_on_write of src_block
+        if( src_block->index() != block_index )
+        {
+            src_node->update_block( block_index, src_block->index() );
+            block_index = src_block->index();
+        }
+
+        for( uint16_t i = start; i < end; ++i )
+        {
+            Link& link = src_node->get_pair( i ).second;
+            if( link.get_block() != block_index )
+                continue;
+
+            OTK_ASSERT( src_block->is_root( link.get_local_address() ) );
+
+            size_t offset = src_block->migrate_subtree( link.get_local_address(), new_block.get() );
+
+            OTK_ASSERT( !src_block->is_root( link.get_local_address() ) );
+
+            link.set_local( false );
+            link.set_block( new_block->index() );
+            link.set_local_address( offset );
+            OTK_ASSERT( new_block->node( offset ) != nullptr );
+        }
+    }
+
     if( !parent )
     {
         OTK_ASSERT( !block_parent );
@@ -1898,22 +2005,16 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
 
         // Root node case. Keep src_node as the root node.
         // Add two nodes, migrate half the data to each.
-        bool need_node_compaction = false, need_record_compaction = false;
-        if( !block->has_room_for_n_nodes( 2, need_node_compaction, need_record_compaction ) )
+        bool need_record_compaction = false;
+        if( !block->has_room_for_n_nodes( 2, need_record_compaction ) )
         {
             split_block( block, nullptr );
         }
             
         if( need_record_compaction )
             block->compact_records();
-        if( need_node_compaction )
-        {
-            block->compact_nodes( nullptr );
-            // Pretty certain that node compaction can't move the Table's root.
-            OTK_ASSERT( block->root_offset( 0 ) == src_link.get_local_address() );
-        }
 
-        OTK_ASSERT( block->has_room_for_n_nodes( 2, need_node_compaction, need_record_compaction ) );
+        OTK_ASSERT( block->has_room_for_n_nodes( 2, need_record_compaction ) );
 
         uint32_t left_offset  = block->add_node();
         uint32_t right_offset = block->add_node();
@@ -1923,9 +2024,6 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
 
         left_node->set_leaf( src_node->is_leaf() );
         right_node->set_leaf( src_node->is_leaf() );
-
-        uint16_t count = src_node->child_count();
-        uint16_t left_count = count >> 1;
 
         if( key_larger )
             left_count = count; // Keep everything in the left node.
@@ -1942,88 +2040,27 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
 
         src_node->insert( { key_smaller ? key : left_node->low_key(),  Link( false, true, block->index(), left_offset  ) } );
         src_node->insert( { key_larger  ? key : right_node->low_key(), Link( false, true, block->index(), right_offset ) } );
+        OTK_ASSERT( block->node( left_offset ) != nullptr );
+        OTK_ASSERT( block->node( right_offset ) != nullptr );
     }
     else
     {
         // Non-root case.
-        bool need_node_compaction = false, need_record_compaction = false;
-        if( !block->has_room_for_n_nodes( 1, need_node_compaction, need_record_compaction ) )
+        bool need_record_compaction = false;
+        if( !block->has_room_for_n_nodes( 1, need_record_compaction ) )
         {
             split_block( block, block_parent);
             return false;
         }
             
-        if( need_node_compaction )
-        {
-            block->compact_nodes( block_parent );
-            return false;
-        }
         if( need_record_compaction )
             block->compact_records();
 
-        OTK_ASSERT( block->has_room_for_n_nodes( 1, need_node_compaction, need_record_compaction ) );
-
-        uint16_t count = src_node->child_count();
-        uint16_t left_count = count >> 1;
-
-        // Check to see if splitting the node would result in two
-        // nodes pointing to the same block, which can't happen.
-        // If so, migrate some subtrees to a new block.
-        if( !src_node->get_pair( left_count - 1 ).second.is_local() &&
-            src_node->get_pair( left_count - 1 ).second.get_block() == src_node->get_pair( left_count ).second.get_block() )
-        {
-            size_t block_index = src_node->get_pair( left_count ).second.get_block();
-            OTK_ASSERT( block_index != block->index() );
-            uint16_t left_n = 0, right_n = 0;
-
-            for( uint16_t i = 0; i < count; ++i )
-                if( src_node->get_pair( i ).second.get_block() == block_index )
-                {
-                    if (i < left_count)
-                        left_n++;
-                    else
-                        right_n++;
-                }
-
-            TableWriterDataBlockPtr new_block = get_new_block();
-
-            uint16_t start = 0;
-            uint16_t end   = left_count;
-            if( left_n > right_n )
-            {
-                start = left_count;
-                end   = count;
-            }
-
-            TableWriterDataBlockPtr src_block = get_block( block_index );
-            // Check for copy_on_write of src_block
-            if( src_block->index() != block_index )
-            {
-                src_node->update_block( block_index, src_block->index() );
-                block_index = src_block->index();
-            }
-
-            for( uint16_t i = start; i < end; ++i )
-            {
-                Link& link = src_node->get_pair( i ).second;
-                if( link.get_block() != block_index )
-                    continue;
-
-                OTK_ASSERT( src_block->is_root( link.get_local_address() ) );
-
-                size_t offset = src_block->migrate_subtree( link.get_local_address(), new_block.get() );
-
-                OTK_ASSERT( !src_block->is_root( link.get_local_address() ) );
-
-                link.set_local( false );
-                link.set_block( new_block->index() );
-                link.set_local_address( offset );
-            }
-        }
+        OTK_ASSERT( block->has_room_for_n_nodes( 1, need_record_compaction ) );    
 
         // Now add a new node and move half of this node to it.
         uint32_t right_offset = block->add_node();
-        Node* right_node      = block->node(right_offset);
+        Node* right_node      = block->node( right_offset );
 
         right_node->set_leaf( src_node->is_leaf() );
         Key to_insert;
@@ -2048,6 +2085,7 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
 
         if( block->is_root( src_link.get_local_address() ) )
             block->add_root( right_offset );
+        OTK_ASSERT( block->node( right_offset ) != nullptr );
     }
 
     return true;
