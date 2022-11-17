@@ -120,8 +120,8 @@ inline bool operator< ( const std::shared_ptr<const Snapshot>& l, const size_t& 
 template <size_t BlockSize>
 struct Link
 {
-    static constexpr size_t block_bits = get_msb(BlockSize);
-    static constexpr size_t local_bits = (8 * sizeof(size_t)) - 2 - block_bits;
+    static constexpr size_t local_bits = get_msb(BlockSize);
+    static constexpr size_t block_bits = (8 * sizeof(size_t)) - 2 - local_bits;
 
     // The two MSBs of Link values are reserved.
     // The highest bit differentiates leaf from interior nodes.
@@ -192,6 +192,17 @@ struct Link
     };
 };
 
+template <size_t BlockSize>
+bool operator==( const Link<BlockSize>& l, const Link<BlockSize>& r )
+{
+    return l.m_link == r.m_link;
+}
+
+template <size_t BlockSize>
+bool operator!=( const Link<BlockSize>& l, const Link<BlockSize>& r )
+{
+    return l.m_link != r.m_link;
+}
 
 // A Node is a sorted array of unique <Key, Link> pairs.
 // Pairs with equivalent keys are considered equal.
@@ -921,7 +932,6 @@ void Node<Key, B, BlockSize>::update_block(const size_t old_block, const size_t 
 template <typename Key, size_t B, size_t BlockSize>
 bool Node<Key, B, BlockSize>::find( const Key& key, Link& o_link ) const
 {
-    OTK_ASSERT( is_leaf() );
     const Pair_T* start = m_pairs, * end = start + m_valid_count;
     const Pair_T* it = std::lower_bound( start, end, key,
         []( const Pair_T& e, const Key& c ) {
@@ -1029,15 +1039,17 @@ template <typename Key, size_t B, size_t BlockSize>
 void Node<Key, B, BlockSize>::validate() const
 {
     if( m_metadata.is_valid() )
+    {
         for( int i = 0; i < m_valid_count; ++i )
         {
             if( i )
             {
-                OTK_ASSERT( m_pairs[ i ].first > m_pairs[ i-1 ].first );
-                OTK_ASSERT( m_pairs[ i ].second.is_leaf() == m_pairs[ i-1 ].second.is_leaf() );
+                OTK_ASSERT( m_pairs[i].first > m_pairs[ i-1 ].first );
+                OTK_ASSERT( m_pairs[i].second.is_leaf() == m_pairs[ i-1 ].second.is_leaf() );
             }
-            OTK_ASSERT( m_pairs[ i ].second.is_leaf() == is_leaf() );
+            OTK_ASSERT( m_pairs[i].second.is_leaf() == is_leaf() );
         }
+    }
 }
 
 
@@ -1745,7 +1757,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
             continue;
         }
 
-        Node* current_node = block->node( current_link.get_local_address() );
+        Node* current_node = block->node( current_link.get_local_address() );      
 
         // Now check whether the current Node is full.
         // If so, we must also split it before proceeding.
@@ -1851,6 +1863,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
 
                 bool result = current_node->insert( std::make_pair( key, Link( true, true, block->index(), offset ) ) );
                 OTK_ASSERT( result );
+
                 return;
             }
         }
@@ -1858,6 +1871,7 @@ void TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Insert( const Key& 
         // Traverse through the current Node, potentially
         // moving to a different block.
         Link next_link = current_node->traverse( key, true );
+        OTK_ASSERT( next_link != root_link );
         if( next_link.get_block() != block->index() )
         {
             block = get_block( next_link.get_block() );
@@ -2049,39 +2063,56 @@ bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::split_node( TableWr
         bool need_record_compaction = false;
         if( !block->has_room_for_n_nodes( 1, need_record_compaction ) )
         {
-            split_block( block, block_parent);
+            split_block( block, block_parent );
             return false;
         }
-            
+
         if( need_record_compaction )
             block->compact_records();
 
-        OTK_ASSERT( block->has_room_for_n_nodes( 1, need_record_compaction ) );    
+        OTK_ASSERT( block->has_room_for_n_nodes( 1, need_record_compaction ) );
 
         // Now add a new node and move half of this node to it.
         uint32_t right_offset = block->add_node();
         Node* right_node      = block->node( right_offset );
 
         right_node->set_leaf( src_node->is_leaf() );
-        Key to_insert;
+        Link new_link( false, parent != block_parent, block->index(), right_offset );
 
-        if( key_larger || key_smaller )
+        if( key_smaller )
         {
-            // Don't move anything around.
-            to_insert = key;
+            // Need to be careful. We updated the parent node so it's key
+            // for this node is the new (smaller) one.
+            // If we do nothing and insert a link to the new node with the
+            // same key, we'll lose the existing node and all it's records.
+            // To fix this, we update the link for that key to point to the
+            // new node, and insert this node's smallest key pointing to
+            // the existing node.
+            parent->update_link( src_link, new_link );
+            parent->insert( { src_node->low_key(), src_link } );
         }
         else
         {
-            for( uint16_t i = left_count; i < count; ++i )
-                right_node->insert( src_node->get_pair( i ) );
+            Key to_insert;
 
-            for( uint16_t i = count - 1; i >= left_count; --i )
-                src_node->erase( i );
+            if( key_larger )
+            {
+                // Don't move anything around.
+                to_insert = key;
+            }
+            else
+            {
+                for( uint16_t i = left_count; i < count; ++i )
+                    right_node->insert( src_node->get_pair( i ) );
 
-            to_insert = right_node->low_key();
+                for( uint16_t i = count - 1; i >= left_count; --i )
+                    src_node->erase( i );
+
+                to_insert = right_node->low_key();
+            }
+
+            parent->insert( { to_insert, new_link } );
         }
-
-        parent->insert( { to_insert, Link( false, parent != block_parent, block->index(), right_offset ) } );
 
         if( block->is_root( src_link.get_local_address() ) )
             block->add_root( right_offset );

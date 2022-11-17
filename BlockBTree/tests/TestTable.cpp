@@ -117,13 +117,13 @@ TEST_F(TestTable, TestSnapshot)
     table.init( /*request_write=*/true);
     auto writer(table.getWriter());
 
-    std::vector<size_t> vec(1024*4);
+    std::vector<size_t> vec(1024*1024);
     std::iota( vec.begin(), vec.end(), 0);
 
     auto rng = std::default_random_engine{};
     std::shuffle( vec.begin(), vec.end(), rng);
 
-    for( size_t i = 0; i < 1024*4; ++i)
+    for( size_t i = 0; i < 1024*1024; ++i)
     {
         size_t j = vec[i];
         writer->Insert( 2*j, RecordT( std::string( std::to_string( 3 * j ) + " this is a long string. 32 bytes." ).c_str() ) );
@@ -133,7 +133,7 @@ TEST_F(TestTable, TestSnapshot)
 
     RecordT record;
 
-    for (size_t i = 0; i < 1024*8; ++i)
+    for (size_t i = 0; i < 1024*2048; ++i)
     {
         if( i & 1 )
             EXPECT_FALSE( reader->Query( i, record ) );
