@@ -47,6 +47,7 @@ BlockFile::BlockFile( const std::filesystem::path& path,
                       std::shared_ptr<Header> header,
                       const size_t block_size,
                       const size_t block_alignment,
+                      const size_t grow_size,
                       const bool request_write )
     : 
 #ifdef WIN32
@@ -57,6 +58,7 @@ BlockFile::BlockFile( const std::filesystem::path& path,
     , m_path( path )
     , m_blockSize( block_size )
     , m_blockAlignment( block_alignment )
+    , m_growSize( grow_size )
     , m_header( header )
 {
     OTK_ASSERT( m_header );
@@ -275,23 +277,46 @@ std::shared_ptr<DataBlock> BlockFile::checkOutNewBlock()
         std::lock_guard guard( m_mutex );
         const offset_t offset = m_freeBlockIndices.size() * sizeof( size_t ) + getBlockOffset( block_index + 1 ) - 1;
 
+        if( offset > m_curEOF )
+        {
+            // Try to grow the file by the grow_size or, if unsuccessful, the block_size.
+            offset_t new_eof = std::max<offset_t>( m_curEOF + m_growSize, offset );
+
 #ifdef WIN32
-        OTK_ASSERT( m_file != INVALID_HANDLE_VALUE );
-        LARGE_INTEGER _offset;
-        _offset.QuadPart = offset;
+            OTK_ASSERT( m_file != INVALID_HANDLE_VALUE );
+            LARGE_INTEGER _offset;
+            _offset.QuadPart = new_eof;
 
-        auto result = SetFilePointerEx( m_file, _offset, NULL, FILE_BEGIN );
-        if( result )
-            result = SetEndOfFile( m_file );
+            auto result = SetFilePointerEx( m_file, _offset, NULL, FILE_BEGIN );
+            if( result )
+                result = SetEndOfFile( m_file );
 
-        if( !result )
-            throw otk::Exception( "Error attempting to increase the size of file.", result );
+            if( !result && new_eof > offset )
+            {
+                // Try a smaller growth if possible, otherwise fail.
+                _offset.QuadPart = offset;
+                result = SetFilePointerEx( m_file, _offset, NULL, FILE_BEGIN );
+                if( result )
+                    result = SetEndOfFile( m_file );
+            }
+
+            if( !result )
+                throw otk::Exception( "Error attempting to increase the size of file.", result );
 #else
-        OTK_ASSERT( m_file >= 0 );
-        auto result = ftruncate( m_file, offset );
-        if( result )
-            throw otk::Exception( "Error attempting to increase the size of file.", errno );
+            OTK_ASSERT( m_file >= 0 );
+            auto result = ftruncate( m_file, new_eof );
+            if( result && new_eof > offset )
+            {
+                // Try a smaller growth if possible, otherwise fail.
+                result = ftruncate( m_file, offset );
+            }
+
+            if( result )
+                throw otk::Exception( "Error attempting to increase the size of file.", errno );
 #endif
+
+            m_curEOF.store( new_eof );
+        }
     }
 
     auto it = m_writeBlocks.emplace( std::make_pair( block_index, std::make_shared<DataBlock>(m_blockSize, m_blockAlignment, block_index) ) ).first;

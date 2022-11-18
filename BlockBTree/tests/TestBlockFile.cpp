@@ -54,7 +54,7 @@ TEST_F(TestBlockFile, TestCreateDestroyWriteable)
     if( std::filesystem::exists( k_filename ) )
         std::filesystem::remove( k_filename );
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024*1024, true );
     EXPECT_EQ( 512, header->m_blockSize );
     EXPECT_EQ( 8, header->m_blockAlignment );
     EXPECT_EQ( 0, header->m_nextBlock );
@@ -69,7 +69,7 @@ TEST_F(TestBlockFile, TestCreateDestroyWriteable)
 TEST_F(TestBlockFile, TestWrite)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     auto block_0 = file.checkOutNewBlock();
     EXPECT_EQ( 0, block_0->index );
     EXPECT_EQ( 512, block_0->size );
@@ -86,7 +86,7 @@ TEST_F(TestBlockFile, TestWrite)
 TEST_F(TestBlockFile, TestCreateReadOnly)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, false );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, false );
     EXPECT_EQ( 512, header->m_blockSize );
     EXPECT_EQ( 8, header->m_blockAlignment );
     EXPECT_EQ( 2, header->m_nextBlock );
@@ -99,7 +99,7 @@ TEST_F(TestBlockFile, TestCreateReadOnly)
 TEST_F(TestBlockFile, TestRead)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file(k_filename, header, 512, 8, false);
+    BlockFile file(k_filename, header, 512, 8, 1024 * 1024, false);
     EXPECT_TRUE(file.exists(0));
     EXPECT_TRUE(file.exists(1));
     auto block_0 = file.checkOutForRead(0);
@@ -118,7 +118,7 @@ TEST_F(TestBlockFile, TestRead)
 TEST_F(TestBlockFile, TestBounds )
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, false );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, false );
     EXPECT_TRUE( file.exists(1) );
     EXPECT_FALSE( file.exists(2) );
     EXPECT_THROW( file.checkOutForRead( 2 ), otk::Exception );
@@ -128,7 +128,7 @@ TEST_F(TestBlockFile, TestBounds )
 TEST_F(TestBlockFile, TestAppendToExisting)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     EXPECT_TRUE( file.exists(0) );
     EXPECT_TRUE( file.exists(1) );
     auto block_2 = file.checkOutNewBlock();
@@ -140,7 +140,7 @@ TEST_F(TestBlockFile, TestAppendToExisting)
 TEST_F(TestBlockFile, TestOverwrite)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     EXPECT_TRUE( file.exists(2) );
     auto block_2 = file.checkOutForReadWrite( 2 );
     EXPECT_EQ( 2, block_2->index );
@@ -150,7 +150,7 @@ TEST_F(TestBlockFile, TestOverwrite)
     file.close();
 
     std::shared_ptr< BlockFile::Header > header_read = std::make_shared< BlockFile::Header >();
-    BlockFile file_read( k_filename, header_read, 512, 8, false );
+    BlockFile file_read( k_filename, header_read, 512, 8, 1024 * 1024, false );
     EXPECT_TRUE( file_read.exists(2) );
     auto block_2_read = file_read.checkOutForRead( 2 );
     EXPECT_EQ( 2, block_2_read->index );
@@ -160,7 +160,7 @@ TEST_F(TestBlockFile, TestOverwrite)
 TEST_F(TestBlockFile, TestUnload)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     EXPECT_TRUE( file.exists(2) );
     auto block_2 = file.checkOutForReadWrite( 2 );
     EXPECT_TRUE( block_2->is_valid() );
@@ -176,7 +176,7 @@ TEST_F(TestBlockFile, TestUnload)
 TEST_F(TestBlockFile, TestFree)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     EXPECT_TRUE( file.exists(1) );
     auto block_1 = file.checkOutForReadWrite( 1 );
     EXPECT_TRUE( block_1->is_valid() );
@@ -201,7 +201,7 @@ TEST_F(TestBlockFile, TestFree)
 TEST_F(TestBlockFile, TestDestroy)
 {
     std::shared_ptr< BlockFile::Header > header = std::make_shared< BlockFile::Header >();
-    BlockFile file( k_filename, header, 512, 8, true );
+    BlockFile file( k_filename, header, 512, 8, 1024 * 1024, true );
     EXPECT_EQ( 4, header->m_nextBlock );
     EXPECT_EQ( 1, header->m_freeListSize );
     EXPECT_TRUE( file.isWriteable() );

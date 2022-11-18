@@ -120,6 +120,7 @@ public:
                         std::shared_ptr<Header> header,
                         const size_t block_size, 
                         const size_t block_alignment, 
+                        const size_t grow_size,
                         const bool request_write );
 
     /// Destroy BlockFile object, closing the associated file. Any outstanding blocks
@@ -210,9 +211,11 @@ private:
     const std::filesystem::path m_path;
     const size_t                m_blockSize;
     const size_t                m_blockAlignment;
+    const size_t                m_growSize;
     bool                        m_writeable{ false };
     std::mutex                  m_mutex;
     std::atomic<size_t>         m_nextBlock{ 0 };
+    std::atomic<offset_t>       m_curEOF{ 0 };
     std::shared_ptr<Header>     m_header;
     bool                        m_valid{ false };
 };

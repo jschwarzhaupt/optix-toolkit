@@ -87,6 +87,13 @@
 //
 //------------------------------------------------------------------------------
 
+#ifdef NDEBUG
+#define OTK_ASSERT( cond ) ((void)0)
+
+#define OTK_ASSERT_MSG( cond, msg ) ((void)0)
+
+#define OTK_ASSERT_FAIL_MSG( msg ) ((void)0)
+#else
 #define OTK_ASSERT( cond )                                                   \
     ::otk::assertCond( static_cast<bool>( cond ), #cond, __FILE__, __LINE__ )
 
@@ -95,6 +102,7 @@
 
 #define OTK_ASSERT_FAIL_MSG( msg )                                           \
     ::otk::assertFailMsg( msg, __FILE__, __LINE__ )
+#endif
 
 namespace otk {
 

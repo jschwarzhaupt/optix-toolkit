@@ -38,6 +38,9 @@
 #include <stack>
 #include <memory>
 #include <map>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 
 namespace sceneDB {
@@ -488,8 +491,8 @@ public:
         int m_next_node{ 0 };
         int m_next_record{ 0 };
         int m_record_count{ 0 };
-        std::set< int > m_free_nodes;
-        std::set< int > m_free_records;
+        std::set< int >    m_free_nodes;
+        std::vector< int > m_free_records;
     };
 
     // Blocks can hold up to B different subtrees. When splitting
@@ -690,7 +693,8 @@ public:
     uint32_t migrate_subtree( uint32_t src_root_offset, TableWriterDataBlock* dst_block );
 
     // Set the snapshot ID for this block.
-    void set_snapshot( const Snapshot& snapshot ) { snapshot_id() = snapshot.m_snapshot_id; }
+    void   set_snapshot( const Snapshot& snapshot ) { *snap_id_ptr() = snapshot.m_snapshot_id; }
+    size_t get_snapshot() const { return *snap_id_ptr(); }
 
     size_t index() const { return m_index; }
 
@@ -704,7 +708,8 @@ private:
     char*       ptr()       { return ( char* )( m_dataBlock->get_data() ); }
     const char* ptr() const { return ( const char* )( m_dataBlock->get_data() ); }
 
-    std::size_t* snap_id_ptr() { return ( size_t* )( ptr() + snap_id_offset() ); }
+    std::size_t*       snap_id_ptr()        { return ( size_t* )( ptr() + snap_id_offset() ); }
+    const std::size_t* snap_id_ptr() const  { return ( size_t* )( ptr() + snap_id_offset() ); }
 
     Node*       node_ptr( const size_t offset )       { return reinterpret_cast< Node* >( ptr() + offset ); }
     const Node* node_ptr( const size_t offset ) const { return reinterpret_cast< const Node* >( ptr() + offset ); }
@@ -722,6 +727,42 @@ private:
     RootData*                    m_rootData;
     size_t                       m_index;
     bool                         m_valid{ false };
+};
+
+
+// TableReaderDataBlock is a wrapper class around a BlockFile::DataBlock.
+// It provides the high-level functionality needed to query the Table.
+// In particular, blocks store metadata, Nodes and Records.
+// Nodes are allocated within a block starting at its lowest address,
+// with subsequent Nodes allocated at increasingly higher addresses.
+// The metadata is stored at the very end of the block.
+// Records are allocated starting at the highest address prior to the
+// metadata section, and their offsets decrease for subsequent Records.
+// The Reader doesn't need any of the metadata so it's not loaded.
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+class TableReaderDataBlock
+{
+public:
+    typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
+    typedef typename TableType::Node Node;
+        
+    TableReaderDataBlock( const std::shared_ptr< const DataBlock >& data )
+        : m_data( ( const char* )( data->get_data() ) )
+    {
+        OTK_ASSERT( data->size == BlockSize );
+    }
+
+    const Node*   node( const size_t offset ) const   { return node_ptr( offset ); }
+    const Record& record( const size_t offset ) const { return *record_ptr( offset ); }
+    const size_t  snapshot_id() const                 { return *( size_t* )( m_data + snap_id_offset() );}
+
+private:
+    static constexpr uint32_t snap_id_offset()   { return BlockSize - sizeof( std::size_t ); }
+
+    const Node*   node_ptr( const size_t offset ) const   { return reinterpret_cast< const Node* >( m_data + offset ); }
+    const Record* record_ptr( const size_t offset ) const { return reinterpret_cast< const Record* >( m_data + offset ); }
+
+    const char* m_data;
 };
 
 
@@ -745,6 +786,7 @@ public:
 
 private:
   typedef struct TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment> TableWriterDataBlock;
+  typedef struct TableReaderDataBlock<Key, Record, B, BlockSize, BlockAlignment> ReadOnlyDataBlock;
   typedef std::shared_ptr<TableWriterDataBlock> TableWriterDataBlockPtr;
 
 public:
@@ -764,6 +806,8 @@ public:
             m_currentSnapshot.set_id( 0 );
             m_currentSnapshot.set_root( 0 );
         }
+
+        m_blockMap.resize( 100 );
     }
 
     // Insert the <Key, Record> pair into the Table.
@@ -814,47 +858,21 @@ private:
     // for the current snapshot.
     TableWriterDataBlockPtr get_root_block();
 
+    // Check whether the block with the given index is new
+    // within the current snapshot or not.
+    bool is_new( const size_t index );
+
     // Returns a Link referencing the root block of the Table.
     Link get_root_link();
 
-    Link                                        m_root_link;
-    Snapshot                                    m_currentSnapshot;
-    std::map< size_t, TableWriterDataBlockPtr > m_blockMap;
-    TableType*                                  m_table;
-    std::shared_ptr< BlockFile >                m_dataFile;
+    Link                                    m_root_link;
+    TableWriterDataBlockPtr                 m_root_block;
+    Snapshot                                m_currentSnapshot;
+    std::vector< TableWriterDataBlockPtr >  m_blockMap;
+    TableType*                              m_table;
+    std::shared_ptr< BlockFile >            m_dataFile;
 };
 
-// TableReaderDataBlock is a wrapper class around a BlockFile::DataBlock.
-// It provides the high-level functionality needed to query the Table.
-// In particular, blocks store metadata, Nodes and Records.
-// Nodes are allocated within a block starting at its lowest address,
-// with subsequent Nodes allocated at increasingly higher addresses.
-// The metadata is stored at the very end of the block.
-// Records are allocated starting at the highest address prior to the
-// metadata section, and their offsets decrease for subsequent Records.
-// The Reader doesn't need any of the metadata so it's not loaded.
-template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
-class TableReaderDataBlock
-{
-public:
-    typedef Table< Key, Record, B, BlockSize, BlockAlignment > TableType;
-    typedef typename TableType::Node Node;
-        
-    TableReaderDataBlock( const std::shared_ptr< const DataBlock >& data )
-        : m_data( ( const char* )( data->get_data() ) )
-    {
-        OTK_ASSERT( data->size == BlockSize );
-    }
-
-    const Node*   node( const size_t offset ) const   { return node_ptr( offset ); }
-    const Record& record( const size_t offset ) const { return *record_ptr( offset ); }
-
-private:
-    const Node*   node_ptr( const size_t offset ) const   { return reinterpret_cast< const Node* >( m_data + offset ); }
-    const Record* record_ptr( const size_t offset ) const { return reinterpret_cast< const Record* >( m_data + offset ); }
-
-    const char* m_data;
-};
 
 // A TableReader is a helper class that can query Tables.
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -895,9 +913,9 @@ protected:
     // Returns a pointer to the block.
     TableReaderDataBlock get_block( size_t index );
 
-    const Link                                  m_root_link;
-    std::map< size_t, TableReaderDataBlock >    m_blockMap;
-    std::shared_ptr< BlockFile >                m_dataFile;
+    const Link                                          m_root_link;
+    std::unordered_map< size_t, TableReaderDataBlock >  m_blockMap;
+    std::shared_ptr< BlockFile >                        m_dataFile;
 };
 
 /* Node method definitions */
@@ -1066,7 +1084,7 @@ void Table< Key, Record, B, BlockSize, BlockAlignment >::init( bool request_writ
         // Create the specified directory if necessary. (Throws if an error occurs.)
         std::filesystem::create_directory( m_directory );
 
-        m_dataFile.reset( new BlockFile( getDataFile(), m_dataFileHeader, BlockSize, BlockAlignment, request_write ) );
+        m_dataFile.reset( new BlockFile( getDataFile(), m_dataFileHeader, BlockSize, BlockAlignment, 32 * 1024 * 1024, request_write ) );
         m_snapshotFile.reset( new SimpleFile( getSnapshotFile(), request_write ) );
 
         initSnapshots();
@@ -1359,7 +1377,9 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
 
     while( !m_metaData.m_free_records.empty() )
     {
-        int offset_new = m_metaData.m_free_records.extract( std::prev( m_metaData.m_free_records.end() ) ).value();
+        int offset_new = m_metaData.m_free_records.back();
+        m_metaData.m_free_records.pop_back();
+
         int offset_old = m_metaData.m_next_record + sizeof( Record );
 
         // Move the record at offset_old into the space at offset_new.
@@ -1370,10 +1390,12 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::compact_re
 
         // Shift forward the offset to the next available Record.
         m_metaData.m_next_record += sizeof( Record );
-        while( m_metaData.m_free_records.count( m_metaData.m_next_record + sizeof( Record ) ) )
+
+        auto it = m_metaData.m_free_records.begin();
+        while( ( it = std::find( m_metaData.m_free_records.begin(), m_metaData.m_free_records.end(), m_metaData.m_next_record + sizeof( Record ) ) ) != m_metaData.m_free_records.end() )
         {
             // Advance through contiguous free space.
-            m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record + sizeof( Record ) ) );
+            m_metaData.m_free_records.erase( it );
             m_metaData.m_next_record += sizeof(Record);
         }
     }
@@ -1468,7 +1490,8 @@ uint32_t TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::add_re
     // Try to first use previously removed Nodes, if possible.
     if( m_metaData.m_free_records.size() )
     {
-        result = m_metaData.m_free_records.extract( std::prev( m_metaData.m_free_records.end() ) ).value();
+        result = m_metaData.m_free_records.back();
+        m_metaData.m_free_records.pop_back();
     }
     else if( no_compact_free_bytes() >= sizeof( Record ) )
     {
@@ -1505,14 +1528,15 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::remove_rec
     {
         m_metaData.m_next_record += sizeof( Record );
         // Coalesce free space at the end.
-        while( m_metaData.m_free_records.count( m_metaData.m_next_record + sizeof( Record ) ) )
+        auto it = m_metaData.m_free_records.begin();
+        while( (it = std::find( m_metaData.m_free_records.begin(), m_metaData.m_free_records.end(), m_metaData.m_next_record + sizeof( Record ) ) ) != m_metaData.m_free_records.end() )
         {
             m_metaData.m_next_record += sizeof( Record );
-            m_metaData.m_free_records.erase( m_metaData.m_free_records.find( m_metaData.m_next_record) );
+            m_metaData.m_free_records.erase( it );
         }
     }
     else
-        m_metaData.m_free_records.insert( offset );
+        m_metaData.m_free_records.push_back( offset );
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -1699,7 +1723,7 @@ void TableWriterDataBlock<Key, Record, B, BlockSize, BlockAlignment>::init_exist
         {
             while( curr < offset )
             {
-                m_metaData.m_free_records.insert( curr );
+                m_metaData.m_free_records.push_back( curr );
                 curr += sizeof( Record );
             }
             curr += sizeof( Record );
@@ -2137,6 +2161,9 @@ size_t TableWriter<Key, Record, B, BlockSize, BlockAlignment>::copy_on_write( co
     m_currentSnapshot.m_modified_blocks.insert( old_block->index );
     m_currentSnapshot.m_new_blocks.insert( new_block->index );
 
+    if( m_blockMap.size() <= new_block->index )
+        m_blockMap.resize( std::max<size_t>( 1.1 * m_blockMap.size(), size_t( 1.1 * new_block->index ) ) );
+
     m_blockMap[ new_block->index ] = block;
 
     return new_block->index;
@@ -2146,21 +2173,23 @@ template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAl
 typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterDataBlockPtr TableWriter<Key, Record, B, BlockSize, BlockAlignment>::get_block( size_t index )
 {
     OTK_ASSERT( m_dataFile->exists( index ) );
-    if( !m_currentSnapshot.is_new( index ) )
+    if( !is_new( index ) )
     {
         index = copy_on_write( index );
     }
 
     OTK_ASSERT( m_currentSnapshot.is_new( index ) );
-    OTK_ASSERT( m_blockMap.count( index ) );
+    OTK_ASSERT( m_blockMap[ index ].get() != nullptr );
+
+    auto& block = m_blockMap[ index ];
 
     // Re-load from disk if we released it before.
-    if( !m_blockMap[index]->is_valid() )
-        m_blockMap[ index ]->set_data( m_dataFile->checkOutForReadWrite( index ) );
+    if( !block->is_valid() )
+        block->set_data( m_dataFile->checkOutForReadWrite( index ) );
 
-    OTK_ASSERT( m_blockMap[ index ]->is_valid() );
+    OTK_ASSERT( block->is_valid() );
 
-    return m_blockMap.at( index );
+    return block;
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -2169,6 +2198,10 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterData
     TableWriterDataBlockPtr new_block = std::make_shared< TableWriterDataBlock >( m_dataFile->checkOutNewBlock() );
     new_block->init( m_currentSnapshot );
     m_currentSnapshot.m_new_blocks.insert( new_block->index() );
+
+    if( m_blockMap.size() <= new_block->index() )
+        m_blockMap.resize( std::max<size_t>( 1.1 * m_blockMap.size(), size_t( 1.1 * new_block->index() ) ) );
+
     m_blockMap[ new_block->index() ] = new_block;
     return new_block;
 }
@@ -2176,29 +2209,36 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterData
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TableWriterDataBlockPtr TableWriter<Key, Record, B, BlockSize, BlockAlignment>::get_root_block()
 {
-    if( !m_dataFile->exists( m_currentSnapshot.m_root_index ) )
+    if( !m_root_block )
     {
-        TableWriterDataBlockPtr new_block = get_new_block();
-        OTK_ASSERT( new_block->index() == m_currentSnapshot.m_root_index );
-        OTK_ASSERT( new_block->root_offset( 0 ) == m_currentSnapshot.m_root_local_offset );
-        Node* root = new_block->node( new_block->root_offset( 0 ) );
-        root->set_leaf( true );
+        if( !m_dataFile->exists( m_currentSnapshot.m_root_index ) )
+        {
+            TableWriterDataBlockPtr new_block = get_new_block();
+            OTK_ASSERT( new_block->index() == m_currentSnapshot.m_root_index );
+            OTK_ASSERT( new_block->root_offset( 0 ) == m_currentSnapshot.m_root_local_offset );
+            OTK_ASSERT( new_block->get_snapshot() == m_currentSnapshot.m_snapshot_id );
+            Node* root = new_block->node( new_block->root_offset( 0 ) );
+            root->set_leaf( true );
+        }
+        else if( !is_new( m_currentSnapshot.m_root_index ) )
+        {
+            m_currentSnapshot.set_root( copy_on_write( m_currentSnapshot.m_root_index ) );
+            m_currentSnapshot.set_root_local_offset( m_blockMap[ m_currentSnapshot.m_root_index ]->root_offset( 0 ) );
+        }
+
+        OTK_ASSERT( m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) );
+
+        auto& block = m_blockMap[ m_currentSnapshot.m_root_index ];
+
+        // Re-load from disk if we released it before.
+        if( !block->is_valid() )
+            block->set_data( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_root_index ) );
+
+        OTK_ASSERT( m_currentSnapshot.m_root_local_offset == block->root_offset( 0 ) );
+
+        m_root_block = block;
     }
-    else if( !m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) )
-    {
-        m_currentSnapshot.set_root( copy_on_write( m_currentSnapshot.m_root_index ) );
-        m_currentSnapshot.set_root_local_offset( m_blockMap[ m_currentSnapshot.m_root_index ]->root_offset( 0 ) );
-    }
-
-    OTK_ASSERT( m_currentSnapshot.is_new( m_currentSnapshot.m_root_index ) );
-
-    // Re-load from disk if we released it before.
-    if( !m_blockMap[ m_currentSnapshot.m_root_index ]->is_valid() )
-        m_blockMap[ m_currentSnapshot.m_root_index ]->set_data( m_dataFile->checkOutForReadWrite( m_currentSnapshot.m_root_index ) );
-
-    OTK_ASSERT( m_currentSnapshot.m_root_local_offset == m_blockMap[ m_currentSnapshot.m_root_index ]->root_offset( 0 ) );
-
-    return m_blockMap.at( m_currentSnapshot.m_root_index );
+    return m_root_block;
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
@@ -2218,6 +2258,21 @@ typename TableWriter<Key, Record, B, BlockSize, BlockAlignment>::Link TableWrite
 }
 
 template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
+bool TableWriter<Key, Record, B, BlockSize, BlockAlignment>::is_new( const size_t index ) 
+{
+    if( m_blockMap.size() <= index )
+        m_blockMap.resize( std::max<size_t>( 1.1 * m_blockMap.size(), size_t( 1.1 * index ) ) );
+
+    if( m_blockMap[ index ].get() == nullptr )
+    {
+        ReadOnlyDataBlock block( m_dataFile->checkOutForRead( index ) );
+        return block.snapshot_id() == m_currentSnapshot.m_snapshot_id;
+    }
+
+    return m_blockMap[ index ]->get_snapshot() == m_currentSnapshot.m_snapshot_id;
+}
+
+template <typename Key, class Record, size_t B, size_t BlockSize, size_t BlockAlignment>
 std::shared_ptr< const Snapshot > TableWriter<Key, Record, B, BlockSize, BlockAlignment>::TakeSnaphot()
 {
     m_dataFile->flush( false );
@@ -2229,9 +2284,11 @@ std::shared_ptr< const Snapshot > TableWriter<Key, Record, B, BlockSize, BlockAl
     m_currentSnapshot.set_root_local_offset( snapshot->m_root_local_offset );
 
     m_root_link.invalidate();
+    m_root_block.reset();
 
     for( const auto& it : m_blockMap )
-        m_dataFile->unloadBlock( it.second->index(), true );
+        if( it.get() )
+            m_dataFile->unloadBlock( it->index(), true );
 
     m_blockMap.clear();
 
@@ -2290,7 +2347,7 @@ typename TableReader<Key, Record, B, BlockSize, BlockAlignment>::TableReaderData
         m_blockMap.emplace( std::make_pair( index, TableReaderDataBlock( m_dataFile->checkOutForRead( index ) ) ) );
     }
 
-    return m_blockMap.at(index);
+    return m_blockMap.at( index );
 }
 
 } // namespace sceneDB
