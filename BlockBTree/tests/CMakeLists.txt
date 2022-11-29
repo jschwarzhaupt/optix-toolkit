@@ -34,6 +34,7 @@ add_executable( testBlockBTree
   TestDataBlock.cpp
   TestSimpleFile.cpp
   TestTable.cpp
+  TestTablePerf.cpp
   TestTablePrinter.cpp
   TestTableWriterDataBlock.cpp
   )  

@@ -275,7 +275,7 @@ std::shared_ptr<DataBlock> BlockFile::checkOutNewBlock()
         // Seek to where the end of this new block would be.
         // Add size of storage for free-list as well.
         std::lock_guard guard( m_mutex );
-        const offset_t offset = m_freeBlockIndices.size() * sizeof( size_t ) + getBlockOffset( block_index + 1 ) - 1;
+        const offset_t offset = m_freeBlockIndices.size() * sizeof( size_t ) + getBlockOffset( block_index + 1 );
 
         if( offset > m_curEOF )
         {
@@ -355,6 +355,50 @@ void BlockFile::flush( bool flush_caches )
         if( result )
             throw otk::Exception( "Error flushing file caches.", errno );
 #endif
+    }
+
+    // Set the size to the correct one required by the file
+    // (we might have over-allocated when growing).
+    const offset_t offset = m_freeBlockIndices.size() * sizeof( size_t ) + getBlockOffset( m_nextBlock );
+
+    if (offset < m_curEOF)
+    {
+        offset_t new_eof = offset;
+
+#ifdef WIN32
+        OTK_ASSERT( m_file != INVALID_HANDLE_VALUE );
+        LARGE_INTEGER _offset;
+        _offset.QuadPart = new_eof;
+
+        auto result = SetFilePointerEx( m_file, _offset, NULL, FILE_BEGIN );
+        if( result )
+            result = SetEndOfFile( m_file );
+
+        if( !result && new_eof > offset )
+        {
+            // Try a smaller growth if possible, otherwise fail.
+            _offset.QuadPart = offset;
+            result = SetFilePointerEx( m_file, _offset, NULL, FILE_BEGIN );
+            if( result )
+                result = SetEndOfFile( m_file );
+        }
+
+        if( !result )
+            throw otk::Exception( "Error attempting to increase the size of file.", result );
+#else
+        OTK_ASSERT( m_file >= 0 );
+        auto result = ftruncate( m_file, new_eof );
+        if( result && new_eof > offset )
+        {
+            // Try a smaller growth if possible, otherwise fail.
+            result = ftruncate( m_file, offset );
+        }
+
+        if( result )
+            throw otk::Exception( "Error attempting to increase the size of file.", errno );
+#endif
+
+        m_curEOF.store( new_eof );
     }
 }
 

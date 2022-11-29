@@ -111,10 +111,29 @@ void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintBlocks( std::
         size_t               block_offset = it->first;
         TableReaderDataBlock block        = TableReader::get_block( block_offset );
 
+        // Collect stats.
+        size_t nodes_bytes  = 0;
+        size_t record_bytes = 0;
+
+        for (size_t node_offset : it->second)
+        {
+            const Node* node = block.node(node_offset);
+            nodes_bytes += sizeof(Node);
+
+            for (unsigned int i = 0; i < node->m_valid_count; ++i)
+                if( node->is_leaf() )
+                    record_bytes += sizeof(Record);
+        }
+
+        const double amount = double(record_bytes + nodes_bytes) / double(BlockSize);
+
         // Begin DOT subgraph.  See https://graphviz.org/Gallery/directed/cluster.html
+        out << std::setprecision(4);
         out << "  subgraph cluster_" << block_offset << " {" << std::endl;
         out << "    style=filled" << std::endl;
-        out << "    color=lightgrey" << std::endl;
+        out << "    color=\"darkgreen;" << amount << ":lightgrey\"" << std::endl;
+        //out << "    label=\" " << (record_bytes + nodes_bytes) << "B (" << nodes_bytes << "N + " << record_bytes << "R) / " << BlockSize << "B -- (" << amount*100. << "%)\"" << std::endl;
+        out << "    label=\"" << amount*100. << "%\"" << std::endl;
 
         for( size_t node_offset : it->second )
         {
@@ -124,9 +143,20 @@ void TablePrinter<Key, Record, B, BlockSize, BlockAlignment>::PrintBlocks( std::
             // See https://graphviz.org/doc/info/shapes.html#record
             out << "    "
                 << "node_" << block_offset << "_" << node_offset << " [label=\"<0>";
-            for( unsigned int i = 1; i < node->m_valid_count; ++i )
+            /*if (!node->is_leaf())
+                for( unsigned int i = 1; i < node->m_valid_count; ++i )
+                {
+                    out << "|<" << i << ">";
+                }
+            else*/
             {
-                out << "|<" << i << ">";
+                out << " " << node->m_valid_count << "/" << B;
+                if( node->is_leaf() )
+                {
+                    out << "\" fillcolor = \"green";
+                    if (node->m_valid_count < B)
+                        out << ";" << float(node->m_valid_count) / float(B) << ":red";
+                }
             }
             out << "\"]" << std::endl;
         }
